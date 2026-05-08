@@ -34,7 +34,7 @@ GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
 MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", "2"))
 RETRY_DELAY: float = float(os.getenv("RETRY_DELAY", "2"))
 
-GEMINI_MODEL = "gemini-2.0-flash"
+GEMINI_MODEL = "gemini-3-flash-preview" # gemini-3.1-flash-lite
 OLLAMA_MODEL = "llama3.2:3b"
 
 # ---------------------------------------------------------------------------
