@@ -154,7 +154,7 @@ Output : feedback dict (structured)
 
 Provider chain:
   PRIMARY  → Google Gemini API (gemini-1.5-flash)
-               Uses: google-generativeai Python SDK
+               Uses: google-genai Python SDK
                Requires: GEMINI_API_KEY in .env
                Retries: up to MAX_RETRIES (default: 2) with RETRY_DELAY seconds between
 
@@ -669,7 +669,7 @@ uvicorn[standard]
 python-multipart
 openai-whisper
 ollama
-google-generativeai
+google-genai
 python-dotenv
 ```
 
