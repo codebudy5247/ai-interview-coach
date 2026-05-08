@@ -578,10 +578,10 @@ YOUR TRANSCRIPT
 - [ ] `GET /api/feedback/:session_id` — return stored feedback JSON
 
 ### Phase 4 — Report Saving
-- [ ] `format_feedback_txt()` in `file_handler.py`
-- [ ] `save_report_txt()` in `file_handler.py`
-- [ ] `GET /api/report/:session_id` — serve `.txt` file as download
-- [ ] Auto-cleanup of temp MP3 after pipeline done
+- [x] `format_feedback_txt()` in `file_handler.py`
+- [x] `save_report_txt()` in `file_handler.py`
+- [x] `GET /api/report/:session_id` — serve `.txt` file as download
+- [x] Auto-cleanup of temp MP3 after pipeline done
 
 ### Phase 5 — Frontend
 - [ ] React + Vite + TailwindCSS setup

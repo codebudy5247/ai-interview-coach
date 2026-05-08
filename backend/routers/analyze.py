@@ -17,7 +17,13 @@ from fastapi import APIRouter, BackgroundTasks, UploadFile, File, Form, HTTPExce
 from fastapi.responses import FileResponse
 
 from models.schemas import AnalyzeResponse, CleanupResponse
-from utils.file_handler import save_upload, delete_temp, get_report_path
+from utils.file_handler import (
+    save_upload,
+    delete_temp,
+    get_report_path,
+    format_feedback_txt,
+    save_report_txt,
+)
 from services.whisper_service import transcribe
 from services.feedback_service import get_feedback, FeedbackServiceError
 
@@ -76,6 +82,14 @@ def _run_pipeline(session_id: str) -> None:
         _sessions[session_id]["feedback"] = feedback
         print(f"[pipeline:{session_id[:8]}] Feedback ready.")
 
+        # --- Step 3: Save .txt report (Phase 4) ---
+        _sessions[session_id]["status"] = "saving_report"
+        print(f"[pipeline:{session_id[:8]}] Saving feedback report...")
+        formatted = format_feedback_txt(feedback, question, transcript, session_id)
+        report_path = save_report_txt(formatted, session_id)
+        _sessions[session_id]["report_path"] = str(report_path)
+        print(f"[pipeline:{session_id[:8]}] Report saved → {report_path}")
+
         _sessions[session_id]["status"] = "done"
 
     except FeedbackServiceError as exc:
@@ -89,7 +103,7 @@ def _run_pipeline(session_id: str) -> None:
         _sessions[session_id]["error"] = f"Pipeline failed: {exc}"
 
     finally:
-        # --- Step 3: Clean up temp MP3 ---
+        # --- Step 4: Clean up temp MP3 ---
         delete_temp(session_id)
         print(f"[pipeline:{session_id[:8]}] Temp MP3 deleted.")
 
@@ -121,6 +135,7 @@ async def analyze(
         "status": "uploaded",
         "feedback": None,
         "transcript": None,
+        "report_path": None,
         "error": None,
     }
 
@@ -183,8 +198,31 @@ async def get_status(session_id: str):
 # ---------------------------------------------------------------------------
 @router.get("/report/{session_id}")
 async def download_report(session_id: str):
-    """Serve the .txt report as a file download (populated in Phase 4)."""
-    path = get_report_path(session_id)
+    """
+    Serve the saved .txt feedback report as a file download.
+
+    Returns:
+        200  FileResponse  — report is ready; browser will download it.
+        202  JSON          — pipeline is still running (report not yet saved).
+        500  JSON          — pipeline ended in an error.
+        404  JSON          — session not found or report file missing.
+    """
+    session = get_session(session_id)  # raises 404 if session unknown
+    status = session["status"]
+
+    if status == "error":
+        raise HTTPException(
+            status_code=500,
+            detail=session.get("error", "Pipeline failed — no report generated."),
+        )
+
+    if status != "done":
+        raise HTTPException(
+            status_code=202,
+            detail=f"Report not ready yet. Current status: {status}",
+        )
+
+    path = get_report_path(session_id)  # raises 404 if file missing
     return FileResponse(
         path=str(path),
         media_type="text/plain",
