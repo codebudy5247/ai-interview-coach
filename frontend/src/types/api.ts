@@ -1,0 +1,31 @@
+// All TypeScript types mirroring the backend Pydantic schemas
+
+export interface FeedbackScore {
+  score: number       // 1–10
+  feedback: string    // per-dimension explanation
+}
+
+export interface FeedbackResponse {
+  overall_score: number
+  scores: {
+    correctness: FeedbackScore
+    clarity: FeedbackScore
+    structure: FeedbackScore
+    relevance: FeedbackScore
+  }
+  what_went_well: string[]
+  what_was_missed: string[]
+  improvements: string[]
+  ideal_answer: string
+  transcript: string
+}
+
+export interface SSEEvent {
+  step: string    // 'uploaded' | 'transcribing' | 'analyzing' | 'saving_report' | 'done' | 'error'
+  status: string  // 'in_progress' | 'done' | 'error' | 'retrying' | ...
+  message: string
+}
+
+export interface AnalyzeResponse {
+  session_id: string
+}
