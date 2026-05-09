@@ -29,3 +29,26 @@ class SSEEvent(BaseModel):
 
 class CleanupResponse(BaseModel):
     success: bool
+
+
+class SessionSummary(BaseModel):
+    """Lightweight session info for the history list."""
+    id: str
+    question: str  # truncated for display
+    overall_score: int
+    created_at: str  # ISO 8601 datetime string
+
+
+class SessionDetail(BaseModel):
+    """Full session data for the detail view."""
+    id: str
+    question: str
+    transcript: str
+    overall_score: int
+    feedback: FeedbackResponse
+    created_at: str
+
+
+class SessionListResponse(BaseModel):
+    sessions: list[SessionSummary]
+    total: int
