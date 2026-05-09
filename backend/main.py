@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from utils.file_handler import ensure_dirs
 from database import init_db
 from routers.analyze import router as analyze_router
+from routers.sessions import router as sessions_router
 
 app = FastAPI(
     title="Interview Coach API",
@@ -38,6 +39,7 @@ async def startup_event():
 # Register routers
 # ---------------------------------------------------------------------------
 app.include_router(analyze_router)
+app.include_router(sessions_router)
 
 
 # ---------------------------------------------------------------------------

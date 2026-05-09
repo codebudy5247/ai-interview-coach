@@ -15,6 +15,7 @@ import uuid
 import threading
 import queue
 import asyncio
+import json
 
 from fastapi import APIRouter, BackgroundTasks, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
@@ -29,6 +30,8 @@ from utils.file_handler import (
 )
 from services.whisper_service import transcribe
 from services.feedback_service import get_feedback, FeedbackServiceError
+from database import SessionLocal
+from models.session_model import InterviewSession
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
@@ -111,6 +114,25 @@ def _run_pipeline(session_id: str) -> None:
         _sessions[session_id]["report_path"] = str(report_path)
         _emit_sse(session_id, "saving_report", "done", "Report saved")
         print(f"[pipeline:{session_id[:8]}] Report saved → {report_path}")
+
+        # --- Step 3b: Persist to database ---
+        _sessions[session_id]["status"] = "persisting"
+        _emit_sse(session_id, "persisting", "in_progress", "Saving to history...")
+        print(f"[pipeline:{session_id[:8]}] Persisting session to database...")
+        db = SessionLocal()
+        try:
+            db_session = InterviewSession(
+                id=session_id,
+                question=question,
+                transcript=transcript,
+                overall_score=feedback["overall_score"],
+                feedback_json=json.dumps(feedback),
+            )
+            db.add(db_session)
+            db.commit()
+            print(f"[pipeline:{session_id[:8]}] Session persisted to DB.")
+        finally:
+            db.close()
 
         _sessions[session_id]["status"] = "done"
         _emit_sse(session_id, "done", "done", "DONE")
