@@ -7,3 +7,4 @@ google-genai
 python-dotenv
 certifi
 imageio-ffmpeg
+sqlalchemy

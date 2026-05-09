@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from utils.file_handler import ensure_dirs
+from database import init_db
 from routers.analyze import router as analyze_router
 
 app = FastAPI(
@@ -30,6 +31,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     ensure_dirs()
+    init_db()
 
 
 # ---------------------------------------------------------------------------
