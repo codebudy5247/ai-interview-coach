@@ -551,31 +551,31 @@ YOUR TRANSCRIPT
 ## 11. Build Phases
 
 ### Phase 1 — Backend Foundation
-- [ ] Setup FastAPI project + folder structure
-- [ ] `main.py` with CORS + router registration
-- [ ] `POST /api/analyze` — accept MP3 + question, save to temp/, return session_id
-- [ ] `utils/file_handler.py` — save + delete temp files
-- [ ] Test upload endpoint with Postman / curl
+- [x] Setup FastAPI project + folder structure
+- [x] `main.py` with CORS + router registration
+- [x] `POST /api/analyze` — accept MP3 + question, save to temp/, return session_id
+- [x] `utils/file_handler.py` — save + delete temp files
+- [x] Test upload endpoint with Postman / curl
 
 ### Phase 2 — AI Pipeline
-- [ ] `whisper_service.py` — transcribe MP3 → text
-- [ ] Test Whisper locally with a sample MP3
-- [ ] Create `.env` file with `GEMINI_API_KEY`, `MAX_RETRIES`, `RETRY_DELAY`
-- [ ] `feedback_service.py` — implement provider chain:
-  - [ ] `build_prompt(question, transcript)` — shared prompt for both providers
-  - [ ] `call_gemini(prompt)` — call Gemini API (`gemini-1.5-flash`) via `google-generativeai`
-  - [ ] `call_ollama(prompt)` — call `llama3.2` via `ollama.chat()`
-  - [ ] `get_feedback(question, transcript)` — retry loop: Gemini (×MAX_RETRIES) → Ollama (×MAX_RETRIES) → raise `FeedbackServiceError`
-  - [ ] Skip Gemini gracefully if `GEMINI_API_KEY` is missing/blank
-- [ ] Test Gemini feedback with a hardcoded transcript
-- [ ] Test Ollama fallback by temporarily revoking the API key
-- [ ] Connect both services in sequence in `routers/analyze.py`
+- [x] `whisper_service.py` — transcribe MP3 → text
+- [x] Test Whisper locally with a sample MP3
+- [x] Create `.env` file with `GEMINI_API_KEY`, `MAX_RETRIES`, `RETRY_DELAY`
+- [x] `feedback_service.py` — implement provider chain:
+  - [x] `build_prompt(question, transcript)` — shared prompt for both providers
+  - [x] `call_gemini(prompt)` — call Gemini API (`gemini-1.5-flash`) via `google-generativeai`
+  - [x] `call_ollama(prompt)` — call `llama3.2` via `ollama.chat()`
+  - [x] `get_feedback(question, transcript)` — retry loop: Gemini (×MAX_RETRIES) → Ollama (×MAX_RETRIES) → raise `FeedbackServiceError`
+  - [x] Skip Gemini gracefully if `GEMINI_API_KEY` is missing/blank
+- [x] Test Gemini feedback with a hardcoded transcript
+- [x] Test Ollama fallback by temporarily revoking the API key
+- [x] Connect both services in sequence in `routers/analyze.py`
 
 ### Phase 3 — SSE Progress Streaming
-- [ ] Background task in FastAPI for the pipeline
-- [ ] SSE endpoint `GET /api/progress/:session_id`
-- [ ] Fire SSE events at each pipeline step
-- [ ] `GET /api/feedback/:session_id` — return stored feedback JSON
+- [x] Background task in FastAPI for the pipeline
+- [x] SSE endpoint `GET /api/progress/:session_id`
+- [x] Fire SSE events at each pipeline step
+- [x] `GET /api/feedback/:session_id` — return stored feedback JSON
 
 ### Phase 4 — Report Saving
 - [x] `format_feedback_txt()` in `file_handler.py`

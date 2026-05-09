@@ -205,7 +205,11 @@ def _call_ollama(prompt: str) -> dict:
 # ---------------------------------------------------------------------------
 # Public API — get_feedback()
 # ---------------------------------------------------------------------------
-def get_feedback(question: str, transcript: str) -> dict:
+def get_feedback(
+    question: str,
+    transcript: str,
+    on_status: callable = None,
+) -> dict:
     """
     Generate structured feedback for the given question + transcript.
 
@@ -215,6 +219,11 @@ def get_feedback(question: str, transcript: str) -> dict:
          On per-day quota exhaustion, skips straight to Ollama.
       2. Ollama (llama3.2) — local fallback
          Retried MAX_RETRIES times before raising FeedbackServiceError.
+
+    Args:
+        question: The interview question text.
+        transcript: The transcribed audio text.
+        on_status: Optional callback for status updates. Called with (provider, attempt, status, message).
 
     Returns:
         Parsed feedback dict matching the FeedbackResponse schema.
@@ -229,31 +238,49 @@ def get_feedback(question: str, transcript: str) -> dict:
         for attempt in range(1, MAX_RETRIES + 1):
             try:
                 print(f"[feedback_service] Gemini attempt {attempt}/{MAX_RETRIES}...")
+                if on_status:
+                    on_status("gemini", attempt, "in_progress", f"Analyzing with Gemini (attempt {attempt})...")
                 result = _call_gemini(prompt)
                 print("[feedback_service] Gemini succeeded.")
+                if on_status:
+                    on_status("gemini", attempt, "done", "Feedback generated via Gemini")
                 return result
             except Exception as exc:
                 print(f"[feedback_service] Gemini attempt {attempt} failed: {exc}")
                 if _is_quota_exhausted(exc):
                     print("[feedback_service] Daily quota exhausted — skipping to Ollama.")
+                    if on_status:
+                        on_status("gemini", attempt, "quota_exhausted", "Daily quota exhausted. Falling back to Ollama...")
                     break
                 if attempt < MAX_RETRIES:
+                    if on_status:
+                        on_status("gemini", attempt, "retrying", f"Gemini failed. Retrying in {_gemini_retry_delay(exc)}s...")
                     delay = _gemini_retry_delay(exc)
                     time.sleep(delay)
         print("[feedback_service] Gemini exhausted all retries. Falling back to Ollama...")
+        if on_status:
+            on_status("gemini", MAX_RETRIES, "fallback", "Gemini exhausted retries. Falling back to Ollama...")
     else:
         print("[feedback_service] GEMINI_API_KEY not set — skipping Gemini, using Ollama directly.")
+        if on_status:
+            on_status("ollama", 1, "in_progress", "GEMINI_API_KEY not set. Using Ollama directly...")
 
     # --- FALLBACK: Ollama llama3.2 ---
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             print(f"[feedback_service] Ollama attempt {attempt}/{MAX_RETRIES}...")
+            if on_status:
+                on_status("ollama", attempt, "in_progress", f"Analyzing with Ollama (attempt {attempt})...")
             result = _call_ollama(prompt)
             print("[feedback_service] Ollama succeeded.")
+            if on_status:
+                on_status("ollama", attempt, "done", "Feedback generated via Ollama")
             return result
         except Exception as exc:
             print(f"[feedback_service] Ollama attempt {attempt} failed: {exc}")
             if attempt < MAX_RETRIES:
+                if on_status:
+                    on_status("ollama", attempt, "retrying", f"Ollama failed. Retrying in {RETRY_DELAY}s...")
                 time.sleep(RETRY_DELAY)
 
     raise FeedbackServiceError(

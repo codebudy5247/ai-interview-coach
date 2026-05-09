@@ -5,6 +5,7 @@ All API route handlers for the interview-coach pipeline.
 
 Endpoints:
   POST   /api/analyze              — Upload MP3 + question → start pipeline → return session_id
+  GET    /api/progress/{session_id} — SSE stream of pipeline progress events
   GET    /api/feedback/{session_id} — Return stored feedback JSON
   GET    /api/report/{session_id}   — Download .txt feedback report
   DELETE /api/cleanup/{session_id}  — Remove temp files + session data
@@ -12,11 +13,13 @@ Endpoints:
 
 import uuid
 import threading
+import queue
+import asyncio
 
 from fastapi import APIRouter, BackgroundTasks, UploadFile, File, Form, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
-from models.schemas import AnalyzeResponse, CleanupResponse
+from models.schemas import AnalyzeResponse, CleanupResponse, SSEEvent
 from utils.file_handler import (
     save_upload,
     delete_temp,
@@ -31,7 +34,7 @@ router = APIRouter(prefix="/api", tags=["analyze"])
 
 # ---------------------------------------------------------------------------
 # In-memory session store
-# Key: session_id  →  dict with status, feedback, transcript, error
+# Key: session_id  →  dict with status, feedback, transcript, error, events queue
 # ---------------------------------------------------------------------------
 _sessions: dict[str, dict] = {}
 
@@ -42,6 +45,15 @@ def get_session(session_id: str) -> dict:
     if session is None:
         raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
     return session
+
+
+def _emit_sse(session_id: str, step: str, status: str, message: str) -> None:
+    """Add an SSE event to the session's event queue."""
+    session = _sessions.get(session_id)
+    if session and "events" in session:
+        event = SSEEvent(step=step, status=status, message=message)
+        session["events"].put(event)
+        print(f"[sse:{session_id[:8]}] {step}: {status} — {message}")
 
 
 # ---------------------------------------------------------------------------
@@ -68,39 +80,52 @@ def _run_pipeline(session_id: str) -> None:
     try:
         # --- Step 1: Transcribe ---
         _sessions[session_id]["status"] = "transcribing"
+        _emit_sse(session_id, "transcribing", "in_progress", "Transcribing your audio...")
         print(f"[pipeline:{session_id[:8]}] Transcribing...")
         transcript = transcribe(mp3_path)
         _sessions[session_id]["transcript"] = transcript
+        _emit_sse(session_id, "transcribing", "done", "Transcription complete")
         print(f"[pipeline:{session_id[:8]}] Transcription done.")
 
         # --- Step 2: Generate feedback ---
         _sessions[session_id]["status"] = "analyzing"
+        _emit_sse(session_id, "analyzing", "in_progress", "Analyzing with AI...")
         print(f"[pipeline:{session_id[:8]}] Generating feedback...")
-        feedback = get_feedback(question, transcript)
+        # Callback to emit SSE events during feedback generation (for retries)
+        def feedback_status_callback(provider: str, attempt: int, status: str, message: str):
+            _emit_sse(session_id, "analyzing", status, message)
+
+        feedback = get_feedback(question, transcript, on_status=feedback_status_callback)
         # Attach transcript to feedback so /api/feedback returns it too
         feedback["transcript"] = transcript
         _sessions[session_id]["feedback"] = feedback
+        _emit_sse(session_id, "analyzing", "done", "Feedback generated")
         print(f"[pipeline:{session_id[:8]}] Feedback ready.")
 
         # --- Step 3: Save .txt report (Phase 4) ---
         _sessions[session_id]["status"] = "saving_report"
+        _emit_sse(session_id, "saving_report", "in_progress", "Saving feedback report...")
         print(f"[pipeline:{session_id[:8]}] Saving feedback report...")
         formatted = format_feedback_txt(feedback, question, transcript, session_id)
         report_path = save_report_txt(formatted, session_id)
         _sessions[session_id]["report_path"] = str(report_path)
+        _emit_sse(session_id, "saving_report", "done", "Report saved")
         print(f"[pipeline:{session_id[:8]}] Report saved → {report_path}")
 
         _sessions[session_id]["status"] = "done"
+        _emit_sse(session_id, "done", "done", "DONE")
 
     except FeedbackServiceError as exc:
         print(f"[pipeline:{session_id[:8]}] FeedbackServiceError: {exc}")
         _sessions[session_id]["status"] = "error"
         _sessions[session_id]["error"] = str(exc)
+        _emit_sse(session_id, "error", "error", str(exc))
 
     except Exception as exc:
         print(f"[pipeline:{session_id[:8]}] Unexpected error: {exc}")
         _sessions[session_id]["status"] = "error"
         _sessions[session_id]["error"] = f"Pipeline failed: {exc}"
+        _emit_sse(session_id, "error", "error", f"Pipeline failed: {exc}")
 
     finally:
         # --- Step 4: Clean up temp MP3 ---
@@ -137,7 +162,11 @@ async def analyze(
         "transcript": None,
         "report_path": None,
         "error": None,
+        "events": queue.Queue(),
     }
+
+    # Emit initial event
+    _emit_sse(session_id, "uploaded", "done", "Audio uploaded")
 
     # Run pipeline in a background thread (Whisper + Gemini/Ollama are blocking/CPU-bound)
     thread = threading.Thread(
@@ -149,6 +178,56 @@ async def analyze(
     thread.start()
 
     return AnalyzeResponse(session_id=session_id)
+
+
+# ---------------------------------------------------------------------------
+# GET /api/progress/{session_id} — SSE stream
+# ---------------------------------------------------------------------------
+@router.get("/progress/{session_id}")
+async def get_progress_stream(session_id: str):
+    """
+    SSE endpoint that streams pipeline progress events.
+    Yields events as JSON lines: {"step": "...", "status": "...", "message": "..."}
+    """
+    session = get_session(session_id)
+    events_queue: queue.Queue = session.get("events")
+
+    if events_queue is None:
+        raise HTTPException(status_code=404, detail="Session has no events queue.")
+
+    async def event_generator():
+        while True:
+            # Check if session still exists
+            if session_id not in _sessions:
+                break
+
+            # Try to get an event from the queue (non-blocking)
+            try:
+                event = events_queue.get_nowait()
+                yield f"data: {event.model_dump_json()}\n\n"
+
+                # Stop streaming only after final "done" or "error" step
+                if event.step in ("done", "error"):
+                    break
+            except queue.Empty:
+                # Queue is empty — check if pipeline already finished
+                current_status = _sessions.get(session_id, {}).get("status")
+                if current_status in ("done", "error"):
+                    # Drain any remaining events that arrived between checks
+                    await asyncio.sleep(0.1)
+                    while True:
+                        try:
+                            event = events_queue.get_nowait()
+                            yield f"data: {event.model_dump_json()}\n\n"
+                            if event.step in ("done", "error"):
+                                return
+                        except queue.Empty:
+                            return  # nothing left, close stream
+
+            # Wait before checking again
+            await asyncio.sleep(0.2)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # ---------------------------------------------------------------------------
