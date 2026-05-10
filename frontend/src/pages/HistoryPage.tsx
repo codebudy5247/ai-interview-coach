@@ -54,6 +54,16 @@ export default function HistoryPage() {
     return 'text-rose-400'
   }
 
+  // Loading skeleton component
+  function SessionSkeleton() {
+    return (
+      <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 animate-pulse">
+        <div className="h-5 bg-slate-800 rounded w-3/4 mb-3" />
+        <div className="h-4 bg-slate-800 rounded w-1/4" />
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex flex-col items-center px-4 py-12">
       <div className="w-full max-w-2xl">
@@ -98,7 +108,11 @@ export default function HistoryPage() {
 
         {/* Session List */}
         {loading ? (
-          <div className="text-center py-12 text-slate-400">Loading...</div>
+          <div className="flex flex-col gap-4">
+            <SessionSkeleton />
+            <SessionSkeleton />
+            <SessionSkeleton />
+          </div>
         ) : sessions.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-slate-400 mb-4">No sessions yet.</p>
