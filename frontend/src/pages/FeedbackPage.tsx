@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import FeedbackReport from '../components/FeedbackReport'
-import { getFeedback, downloadReport } from '../services/api'
+import { getFeedback, getSessionDetail, downloadReport } from '../services/api'
 import type { FeedbackResponse } from '../types/api'
 
 export default function FeedbackPage() {
@@ -20,25 +20,32 @@ export default function FeedbackPage() {
   useEffect(() => {
     if (!sessionId) return
 
-    function tryFetch() {
+    async function tryFetch() {
       attemptsRef.current += 1
-      getFeedback(sessionId!)
-        .then((data) => {
-          setFeedback(data)
-          setLoading(false)
-          setProcessing(false)
-        })
-        .catch((err: unknown) => {
-          const msg = err instanceof Error ? err.message : 'Could not load feedback.'
-          // If pipeline still running, retry up to MAX_ATTEMPTS
-          if (msg.includes('still processing') && attemptsRef.current < MAX_ATTEMPTS) {
-            setProcessing(true)
-            retryRef.current = setTimeout(tryFetch, 2000)
-          } else {
+      try {
+        const data = await getFeedback(sessionId!)
+        setFeedback(data)
+        setLoading(false)
+        setProcessing(false)
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Could not load feedback.'
+        // If pipeline still running, retry up to MAX_ATTEMPTS
+        if (msg.includes('still processing') && attemptsRef.current < MAX_ATTEMPTS) {
+          setProcessing(true)
+          retryRef.current = setTimeout(tryFetch, 2000)
+        } else {
+          // Try loading from DB (in-memory session may be gone after server restart)
+          try {
+            const sessionData = await getSessionDetail(sessionId!)
+            setFeedback(sessionData.feedback)
+            setLoading(false)
+            setProcessing(false)
+          } catch (dbErr) {
             setError(msg)
             setLoading(false)
           }
-        })
+        }
+      }
     }
 
     tryFetch()
@@ -90,11 +97,19 @@ export default function FeedbackPage() {
       <div className="w-full max-w-2xl">
 
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-100">📋 Feedback Report</h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Session: {sessionId?.slice(0, 8)}
-          </p>
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-100">📋 Feedback Report</h1>
+            <p className="text-slate-500 text-sm mt-1">
+              Session: {sessionId?.slice(0, 8)}
+            </p>
+          </div>
+          <Link
+            to="/history"
+            className="text-sm text-indigo-400 hover:text-indigo-300"
+          >
+            📚 View History
+          </Link>
         </div>
 
         <FeedbackReport
