@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import QuestionInput from '../components/QuestionInput'
 import AudioUploader from '../components/AudioUploader'
 import { analyzeAnswer } from '../services/api'
@@ -45,6 +45,12 @@ export default function UploadPage() {
           <p className="mt-2 text-slate-400 text-sm">
             Practice. Get AI Feedback. Improve.
           </p>
+          <Link
+            to="/history"
+            className="mt-3 inline-block text-sm text-indigo-400 hover:text-indigo-300"
+          >
+            📚 View History
+          </Link>
         </div>
 
         {/* Form card */}

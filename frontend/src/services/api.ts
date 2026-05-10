@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AnalyzeResponse, FeedbackResponse, SSEEvent } from '../types/api'
+import type { AnalyzeResponse, FeedbackResponse, SSEEvent, SessionListResponse } from '../types/api'
 
 // All calls go through the Vite proxy: /api → http://localhost:8000/api
 const http = axios.create({ baseURL: '/api' })
@@ -77,4 +77,40 @@ export function openProgressStream(
  */
 export function downloadReport(sessionId: string): void {
   window.open(`/api/report/${sessionId}`, '_blank')
+}
+
+/**
+ * GET /api/sessions — list all saved sessions with optional search and sort
+ */
+export async function getSessions(
+  search?: string,
+  sort: string = 'newest',
+): Promise<SessionListResponse> {
+  const params = new URLSearchParams()
+  if (search) params.set('search', search)
+  if (sort) params.set('sort', sort)
+  const { data } = await http.get<SessionListResponse>(`/sessions?${params}`)
+  return data
+}
+
+/**
+ * GET /api/sessions/:sessionId — get full session detail with feedback
+ */
+export async function getSessionDetail(sessionId: string): Promise<{
+  id: string
+  question: string
+  transcript: string
+  overall_score: number
+  feedback: FeedbackResponse
+  created_at: string
+}> {
+  const { data } = await http.get(`/sessions/${sessionId}`)
+  return data
+}
+
+/**
+ * DELETE /api/sessions/:sessionId — delete a session from history
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  await http.delete(`/sessions/${sessionId}`)
 }

@@ -29,3 +29,15 @@ export interface SSEEvent {
 export interface AnalyzeResponse {
   session_id: string
 }
+
+export interface SessionSummary {
+  id: string
+  question: string
+  overall_score: number
+  created_at: string
+}
+
+export interface SessionListResponse {
+  sessions: SessionSummary[]
+  total: number
+}
