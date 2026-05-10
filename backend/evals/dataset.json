@@ -1,0 +1,142 @@
+[
+  {
+    "id": "tc_01_perfect_react",
+    "category": "Perfect Answer",
+    "question": "Can you explain the difference between useMemo and useCallback in React?",
+    "transcript": "Sure. Both useMemo and useCallback are hooks used for performance optimization in React by caching values between renders. The main difference is what they return. useMemo is used to memoize the result of a calculation or a returned value, preventing expensive functions from running on every render. On the other hand, useCallback is used to memoize the actual function definition itself, which is really useful when you're passing callbacks down to optimized child components so they don't re-render unnecessarily. Under the hood, useCallback(fn, deps) is actually equivalent to useMemo(() => fn, deps).",
+    "expected_behavior": "Should give a high score (9-10) across all dimensions. Feedback should acknowledge the clear explanation and the accurate technical comparison."
+  },
+  {
+    "id": "tc_02_perfect_rest",
+    "category": "Perfect Answer",
+    "question": "What is the difference between REST and GraphQL?",
+    "transcript": "REST is an architectural style where the server dictates the structure of the data returned, usually organizing data into multiple endpoints representing resources like /users or /posts. This can sometimes lead to over-fetching or under-fetching data. GraphQL, developed by Facebook, is a query language where the client specifies exactly what data it needs in a single request to a single endpoint. While GraphQL provides more flexibility and solves the over-fetching problem, REST is often simpler to implement and benefits from standard HTTP caching mechanisms.",
+    "expected_behavior": "Should give a high score. Feedback should highlight the accurate comparison of endpoints and the over-fetching/under-fetching problem."
+  },
+  {
+    "id": "tc_03_rambler_css",
+    "category": "The Rambler",
+    "question": "When would you use CSS Grid over Flexbox?",
+    "transcript": "Well, CSS has evolved a lot. Back in the day we used tables for everything, and then we moved to floats, which required all those weird clearfix hacks. Oh man, I hated clearfixes. Then Bootstrap came out with the 12-column grid. But to answer your question, Flexbox is pretty cool. Flexbox is mostly for laying things out in a single direction, like a row or a column. Grid is newer. Flexbox is really good for navbars. Grid is... well, Grid lets you do two dimensions, so both rows and columns at the same time. But yeah, tables were the worst.",
+    "expected_behavior": "Should dock points for structure and clarity. Feedback should point out the unnecessary tangent about tables and floats, and suggest getting straight to the 1D vs 2D layout distinction."
+  },
+  {
+    "id": "tc_04_rambler_python",
+    "category": "The Rambler",
+    "question": "What is the difference between a list and a dictionary in Python?",
+    "transcript": "Lists are like arrays in Java. You know, in C++ you have vectors and arrays, and memory management is manual, so you have to be careful about buffer overflows and garbage collection. Well, C++ doesn't have garbage collection like Java does. Java has the JVM. But in Python, a list is an ordered collection of items, and it's mutable. A dictionary is totally different. It's like a HashMap in Java. It uses key-value pairs. Hashing algorithms are really fascinating, like SHA-256 for cryptography. But yeah, dicts use keys to look up values fast.",
+    "expected_behavior": "Should dock points for relevance and structure. Feedback should explicitly advise the candidate to avoid bringing up unrelated languages or cryptography when asked a basic Python question."
+  },
+  {
+    "id": "tc_05_blank_mind",
+    "category": "The Blank Mind",
+    "question": "Can you explain the concept of Containerization and how Docker works?",
+    "transcript": "Uh... containerization... man, my mind just went completely blank. I've heard of Docker but I've never actually used it. I'm sorry, I don't think I can answer this one.",
+    "expected_behavior": "Should give a very low score (1-2). Feedback should be encouraging but accurate, suggesting they study the basics of isolated environments, images, and containers."
+  },
+  {
+    "id": "tc_06_blank_mind",
+    "category": "The Blank Mind",
+    "question": "What is an INNER JOIN in SQL?",
+    "transcript": "An inner join... um... is it when you join two tables from the inside? I'm not really sure, I mostly use NoSQL databases like MongoDB. Sorry.",
+    "expected_behavior": "Should give a low score for correctness. Feedback should define an INNER JOIN and suggest studying relational algebra basics."
+  },
+  {
+    "id": "tc_07_confident_wrong",
+    "category": "Confident Wrong Answer",
+    "question": "What is the difference between HTTP GET and POST methods?",
+    "transcript": "This is a great question. GET is used when you want to send highly secure, encrypted data, because the data is heavily encrypted inside the URL string itself. POST, on the other hand, is completely unencrypted and is mostly used just for fetching simple HTML pages from the server when security doesn't matter.",
+    "expected_behavior": "Should heavily penalize correctness (1-2). Feedback MUST explicitly state that the candidate has the definitions completely backwards and explain that GET is visible in the URL while POST puts data in the body."
+  },
+  {
+    "id": "tc_08_confident_wrong",
+    "category": "Confident Wrong Answer",
+    "question": "What is a closure in JavaScript?",
+    "transcript": "A closure in JavaScript is a built-in browser API that automatically clears the local storage and session storage whenever the user closes the browser window or tab. It ensures that no memory leaks happen when the user navigates away from your site.",
+    "expected_behavior": "Should score very low on correctness. Feedback must correct the severe misunderstanding, explaining that a closure is a function having access to its lexical scope, not a browser window event."
+  },
+  {
+    "id": "tc_09_off_topic",
+    "category": "Off-Topic Pivot",
+    "question": "What are the core principles of the Agile methodology?",
+    "transcript": "Agile is a way of managing projects, but honestly, project management isn't my passion. What I really love is the Rust programming language. Let me tell you why Rust is superior to C++. Rust's borrow checker completely eliminates data races at compile time without needing a garbage collector...",
+    "expected_behavior": "Should score low on relevance (1). Feedback should note that the candidate completely dodged the behavioral/process question to talk about a programming language."
+  },
+  {
+    "id": "tc_10_off_topic",
+    "category": "Off-Topic Pivot",
+    "question": "Can you explain Database Normalization?",
+    "transcript": "Database normalization is an older concept for organizing data. But the future of data isn't centralized databases, it's Web3 and the blockchain. By distributing the ledger across decentralized nodes, we ensure trustless verification without a central authority...",
+    "expected_behavior": "Should score low on relevance and correctness. Feedback should point out that pivoting to blockchain when asked a fundamental DB question is a massive red flag in interviews."
+  },
+  {
+    "id": "tc_11_almost_perfect",
+    "category": "Almost Perfect, Missed Key Detail",
+    "question": "What is the time complexity of searching in a Binary Search Tree?",
+    "transcript": "When you search in a Binary Search Tree, you start at the root. If your target is smaller, you go left. If it's bigger, you go right. Because you cut the search space in half at each step, the time complexity is O(log N).",
+    "expected_behavior": "Should score well, but MUST miss correctness/completeness points. Feedback should explicitly point out that O(log N) is only the average case, and the worst-case time complexity is O(N) if the tree becomes unbalanced."
+  },
+  {
+    "id": "tc_12_almost_perfect",
+    "category": "Almost Perfect, Missed Key Detail",
+    "question": "Can you name the SOLID principles of object-oriented design?",
+    "transcript": "Sure, SOLID stands for Single Responsibility Principle, Open-Closed Principle, Interface Segregation Principle, and Dependency Inversion Principle. These guidelines help make software more maintainable and easier to scale.",
+    "expected_behavior": "Should score high, but note the omission. Feedback must point out that the 'L' (Liskov Substitution Principle) was completely forgotten."
+  },
+  {
+    "id": "tc_13_nervous_correct",
+    "category": "Nervous but Correct",
+    "question": "What is Big O notation?",
+    "transcript": "Um, Big O notation is, uh... it's a way to describe... well, it describes how the runtime or the memory requirements of an algorithm, like, scale as the input size grows. So, um, if you have a loop that goes through an array, it's O(N). But if it's a nested loop, wait, yeah, a nested loop over the same array is O(N squared). So it basically gives you the worst-case scenario for performance.",
+    "expected_behavior": "Should score high on correctness, but take a minor deduction on clarity/structure. Feedback should be encouraging, advising the candidate to take a deep breath and speak with more confidence since their technical knowledge is completely correct."
+  },
+  {
+    "id": "tc_14_too_brief",
+    "category": "Too Brief",
+    "question": "What is CI/CD?",
+    "transcript": "CI/CD stands for Continuous Integration and Continuous Deployment. It's used to automate testing and deploying code.",
+    "expected_behavior": "Should score okay on correctness but low on depth. Feedback should advise the candidate to expand on their answers, perhaps by giving examples of tools (Jenkins, GitHub Actions) and explaining the benefits."
+  },
+  {
+    "id": "tc_15_too_brief",
+    "category": "Too Brief",
+    "question": "What is the difference between a monolith and microservices architecture?",
+    "transcript": "A monolith is when all your code is in one big application. Microservices are when you split it up into many smaller applications that talk to each other over the network.",
+    "expected_behavior": "Correctness is fine, but extremely brief. Feedback should suggest elaborating on the pros and cons of each (e.g., deployment overhead, scaling, team autonomy)."
+  },
+  {
+    "id": "tc_16_hallucinator",
+    "category": "The Hallucinator",
+    "question": "How does React's Virtual DOM work?",
+    "transcript": "React uses something called the Quantum DOM. When a state changes, the Quantum DOM bypasses the browser entirely and writes directly to the GPU memory using O(1) rendering. This is why React is so much faster than Angular, which still uses the classic DOM.",
+    "expected_behavior": "Should give a 1 for correctness. Feedback must aggressively point out that the 'Quantum DOM' is entirely made up and explain the actual diffing algorithm used by the Virtual DOM."
+  },
+  {
+    "id": "tc_17_arrogant",
+    "category": "The Arrogant Answer",
+    "question": "Can you explain what garbage collection is in Python?",
+    "transcript": "Look, anyone who knows anything about real engineering knows Python is basically a toy language for beginners. But since you asked, garbage collection is just when the interpreter cleans up memory so developers don't have to think. I normally write in C where I manage my own memory like a real programmer.",
+    "expected_behavior": "Correctness might be passable, but the tone is terrible. Feedback should heavily penalize the structure/tone (or overall score) and strongly advise the candidate that arrogance is a huge red flag in behavioral and technical interviews."
+  },
+  {
+    "id": "tc_18_over_explainer",
+    "category": "The Over-Explainer",
+    "question": "What is a REST API?",
+    "transcript": "To understand a REST API, you first have to understand the invention of the internet. In the 1960s, ARPANET was created... fast forward to the OSI model, we have 7 layers. Layer 4 is TCP/IP. When a packet travels over TCP, it performs a three-way handshake. Then HTTP was invented by Tim Berners-Lee. HTTP has verbs. REST just uses those verbs.",
+    "expected_behavior": "Should penalize relevance and structure. Feedback should point out that while the history is interesting, it completely wastes interview time and the candidate needs to get straight to the point (stateless, resources, standard HTTP methods)."
+  },
+  {
+    "id": "tc_19_perfect_behavioral",
+    "category": "Perfect Answer (Behavioral)",
+    "question": "Tell me about a time you had a conflict with a teammate.",
+    "transcript": "At my last job, a senior engineer and I disagreed on the architecture for a new microservice. He wanted to use gRPC, and I wanted to stick to REST. First, I set up a 1-on-1 meeting to understand his perspective without being defensive. I realized his main concern was latency. I then created a quick benchmark comparing both for our specific payload. The data showed gRPC was 30% faster, so I agreed with his approach. It taught me to always look at the data rather than making assumptions.",
+    "expected_behavior": "Should score a 10. Feedback should highlight the excellent use of the STAR method (Situation, Task, Action, Result) and commend the candidate's professional conflict resolution."
+  },
+  {
+    "id": "tc_20_toxic",
+    "category": "Toxic Answer",
+    "question": "What is the difference between a process and a thread?",
+    "transcript": "Are you serious? I literally have 10 years of experience on my resume and you're asking me a freshman college question? I'm not going to answer that. Let's move on to something actually challenging.",
+    "expected_behavior": "Should give a 1 across the board. Feedback MUST immediately flag the behavior as unprofessional, noting that interviewers ask fundamental questions to check communication skills and attitude, and this response would result in an instant rejection."
+  }
+]
