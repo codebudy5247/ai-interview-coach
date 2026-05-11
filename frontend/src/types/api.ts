@@ -18,6 +18,7 @@ export interface FeedbackResponse {
   improvements: string[]
   ideal_answer: string
   transcript: string
+  audio_url?: string
 }
 
 export interface SSEEvent {

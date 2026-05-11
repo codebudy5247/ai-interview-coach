@@ -145,9 +145,12 @@ export default function FeedbackReport({
         </Section>
 
         <Section id="section-transcript" emoji="📝" title="Your Transcript">
-          <p className="text-sm text-slate-400 leading-relaxed italic">
+          <p className="text-sm text-slate-400 leading-relaxed italic mb-3">
             "{feedback.transcript}"
           </p>
+          {feedback.audio_url && (
+            <audio controls src={feedback.audio_url} className="w-full" />
+          )}
         </Section>
 
         <Section id="section-ideal" emoji="🏆" title="Ideal Answer">

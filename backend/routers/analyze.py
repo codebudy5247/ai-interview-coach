@@ -30,6 +30,7 @@ from utils.file_handler import (
 )
 from services.whisper_service import transcribe
 from services.feedback_service import get_feedback, FeedbackServiceError
+from services.imagekit_service import upload_audio, delete_audio
 from database import SessionLocal
 from models.session_model import InterviewSession
 
@@ -80,6 +81,9 @@ def _run_pipeline(session_id: str) -> None:
     mp3_path = session["mp3_path"]
     question = session["question"]
 
+    # Track imagekit file_id for cleanup if pipeline fails after upload
+    imagekit_file_id = None
+
     try:
         # --- Step 1: Transcribe ---
         _sessions[session_id]["status"] = "transcribing"
@@ -90,6 +94,19 @@ def _run_pipeline(session_id: str) -> None:
         _emit_sse(session_id, "transcribing", "done", "Transcription complete")
         print(f"[pipeline:{session_id[:8]}] Transcription done.")
 
+        # --- Step 1b: Upload audio to ImageKit (Phase 2) ---
+        _sessions[session_id]["status"] = "uploading_audio"
+        _emit_sse(session_id, "uploading_audio", "in_progress", "Uploading audio to cloud...")
+        print(f"[pipeline:{session_id[:8]}] Uploading audio to ImageKit...")
+        file_name = f"{session_id}.mp3"
+        upload_result = upload_audio(mp3_path, file_name)
+        audio_url = upload_result["url"]
+        imagekit_file_id = upload_result["file_id"]
+        _sessions[session_id]["audio_url"] = audio_url
+        _sessions[session_id]["imagekit_file_id"] = imagekit_file_id
+        _emit_sse(session_id, "uploading_audio", "done", "Audio uploaded to cloud")
+        print(f"[pipeline:{session_id[:8]}] Audio uploaded → {audio_url}")
+
         # --- Step 2: Generate feedback ---
         _sessions[session_id]["status"] = "analyzing"
         _emit_sse(session_id, "analyzing", "in_progress", "Analyzing with AI...")
@@ -99,8 +116,9 @@ def _run_pipeline(session_id: str) -> None:
             _emit_sse(session_id, "analyzing", status, message)
 
         feedback = get_feedback(question, transcript, on_status=feedback_status_callback)
-        # Attach transcript to feedback so /api/feedback returns it too
+        # Attach transcript and audio_url to feedback so /api/feedback returns it too
         feedback["transcript"] = transcript
+        feedback["audio_url"] = audio_url
         _sessions[session_id]["feedback"] = feedback
         _emit_sse(session_id, "analyzing", "done", "Feedback generated")
         print(f"[pipeline:{session_id[:8]}] Feedback ready.")
@@ -139,12 +157,20 @@ def _run_pipeline(session_id: str) -> None:
 
     except FeedbackServiceError as exc:
         print(f"[pipeline:{session_id[:8]}] FeedbackServiceError: {exc}")
+        # Rollback: delete uploaded audio if ImageKit upload succeeded
+        if imagekit_file_id:
+            print(f"[pipeline:{session_id[:8]}] Rolling back: deleting audio from ImageKit...")
+            delete_audio(imagekit_file_id)
         _sessions[session_id]["status"] = "error"
         _sessions[session_id]["error"] = str(exc)
         _emit_sse(session_id, "error", "error", str(exc))
 
     except Exception as exc:
         print(f"[pipeline:{session_id[:8]}] Unexpected error: {exc}")
+        # Rollback: delete uploaded audio if ImageKit upload succeeded
+        if imagekit_file_id:
+            print(f"[pipeline:{session_id[:8]}] Rolling back: deleting audio from ImageKit...")
+            delete_audio(imagekit_file_id)
         _sessions[session_id]["status"] = "error"
         _sessions[session_id]["error"] = f"Pipeline failed: {exc}"
         _emit_sse(session_id, "error", "error", f"Pipeline failed: {exc}")
