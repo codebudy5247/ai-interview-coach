@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Interview Coach is an AI-powered mock interview practice tool. Users upload an MP3 of their interview answer, and the app transcribes it using Whisper, then analyzes it using Gemini API (primary) with automatic Ollama llama3.2 fallback (local, offline-safe).
+Interview Coach is an AI-powered mock interview practice tool. Users upload an MP3 of their interview answer, and the app transcribes it using Whisper, then analyzes it using Gemini API (primary) with automatic Ollama llama3.2 fallback (local, offline-safe). Audio files are stored via ImageKit for cloud storage.
 
 ## Running the Project
 
@@ -37,18 +37,15 @@ npm run dev
 ```
 UI runs at http://localhost:5173
 
-### Quick Start Script
-```bash
-./start.sh
-```
-
 ## Architecture
 
 ### Backend (FastAPI)
 - **main.py**: App entry point, CORS config, router registration
 - **routers/analyze.py**: Core API endpoints (`/api/analyze`, `/api/progress`, `/api/feedback`, `/api/cleanup`)
+- **routers/sessions.py**: Session history management
 - **services/whisper_service.py**: Audio transcription using OpenAI Whisper
 - **services/feedback_service.py**: AI feedback generation with Gemini → Ollama fallback + retry logic
+- **services/imagekit_service.py**: ImageKit integration for audio file storage
 - **utils/file_handler.py**: File upload/save, report generation, temp file cleanup
 - **models/schemas.py**: Pydantic request/response models
 
@@ -62,7 +59,7 @@ UI runs at http://localhost:5173
 ### Pipeline Flow
 1. User submits question + audio file via `POST /api/analyze`
 2. Backend returns `session_id` immediately
-3. Background thread runs pipeline: save file → transcribe → generate feedback → save report
+3. Background thread runs pipeline: upload to ImageKit → transcribe → generate feedback → save report
 4. Client polls via SSE (`GET /api/progress/{session_id}`) for real-time status updates
 5. Client fetches final feedback via `GET /api/feedback/{session_id}`
 
@@ -76,6 +73,8 @@ UI runs at http://localhost:5173
 | GET | `/api/feedback/{session_id}` | Get structured feedback JSON |
 | GET | `/api/report/{session_id}` | Download .txt feedback report |
 | DELETE | `/api/cleanup/{session_id}` | Remove session data |
+| GET | `/api/sessions` | List session history |
+| GET | `/api/sessions/{session_id}` | Get session details |
 
 ## Key Configuration
 
@@ -84,3 +83,6 @@ API keys are stored in `backend/.env`:
 - `GEMINI_MODEL`: Defaults to `gemini-1.5-flash`
 - `OLLAMA_MODEL`: Fallback model, defaults to `llama3.2`
 - `MAX_RETRIES`: Gemini retry count before fallback
+- `IMAGEKIT_PUBLIC_KEY`: ImageKit public key (get from https://imagekit.io/dashboard/developer)
+- `IMAGEKIT_PRIVATE_KEY`: ImageKit private key
+- `IMAGEKIT_URL_ENDPOINT`: ImageKit URL endpoint
