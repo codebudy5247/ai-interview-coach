@@ -144,7 +144,7 @@ export default function FeedbackReport({
           </ul>
         </Section>
 
-        <Section id="section-transcript" emoji="📝" title="Your Transcript">
+        <Section id="section-transcript" emoji="📝" title="Your Transcript" defaultOpen>
           <p className="text-sm text-slate-400 leading-relaxed italic mb-3">
             "{feedback.transcript}"
           </p>
