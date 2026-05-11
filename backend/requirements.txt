@@ -8,3 +8,4 @@ python-dotenv
 certifi
 imageio-ffmpeg
 sqlalchemy
+imagekitio
