@@ -14,24 +14,37 @@ def ensure_dirs() -> None:
 
 async def save_upload(file: UploadFile, session_id: str) -> Path:
     """
-    Save an uploaded MP3 file to temp/{session_id}.mp3.
+    Save an uploaded audio file to temp/{session_id}.{ext}.
     Returns the path to the saved file.
-    Raises HTTPException 400 if the file is not an MP3.
+    Raises HTTPException 400 if the file is not an audio file.
     """
-    # Basic MIME / extension validation
     filename = file.filename or ""
     content_type = file.content_type or ""
-    if not (
-        filename.lower().endswith(".mp3")
-        or "audio/mpeg" in content_type
-        or "audio/mp3" in content_type
-    ):
+    
+    # Check if it's an audio MIME type or has an audio extension
+    audio_extensions = (".mp3", ".wav", ".m4a", ".webm", ".ogg", ".flac")
+    
+    if not (content_type.startswith("audio/") or filename.lower().endswith(audio_extensions)):
         raise HTTPException(
             status_code=400,
-            detail="Only MP3 audio files are accepted.",
+            detail="Only audio files are accepted.",
         )
 
-    dest = TEMP_DIR / f"{session_id}.mp3"
+    # Extract extension or fallback to .webm if we can't determine it (e.g., from blobs)
+    ext = Path(filename).suffix.lower()
+    if not ext or ext not in audio_extensions:
+        if "webm" in content_type:
+            ext = ".webm"
+        elif "mp4" in content_type:
+            ext = ".m4a"
+        elif "mpeg" in content_type:
+            ext = ".mp3"
+        elif "wav" in content_type:
+            ext = ".wav"
+        else:
+            ext = ".webm" # default for browser recordings if no filename
+
+    dest = TEMP_DIR / f"{session_id}{ext}"
     with dest.open("wb") as out:
         shutil.copyfileobj(file.file, out)
 
@@ -39,11 +52,12 @@ async def save_upload(file: UploadFile, session_id: str) -> Path:
 
 
 def delete_temp(session_id: str) -> None:
-    """Remove the temporary MP3 file for a session (if it exists)."""
-    path = TEMP_DIR / f"{session_id}.mp3"
-    try:
-        path.unlink(missing_ok=True)
-    except Exception:
-        pass  # Best-effort cleanup
+    """Remove the temporary audio file for a session (if it exists)."""
+    # Find any file starting with session_id in TEMP_DIR
+    for path in TEMP_DIR.glob(f"{session_id}.*"):
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass  # Best-effort cleanup
 
 

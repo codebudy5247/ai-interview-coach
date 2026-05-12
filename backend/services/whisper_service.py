@@ -61,12 +61,12 @@ def _get_model() -> whisper.Whisper:
     return _model
 
 
-def transcribe(mp3_path: str) -> str:
+def transcribe(audio_path: str) -> str:
     """
-    Transcribe the audio file at `mp3_path` and return the transcript string.
+    Transcribe the audio file at `audio_path` and return the transcript string.
 
     Args:
-        mp3_path: Absolute path to the MP3 file.
+        audio_path: Absolute path to the audio file.
 
     Returns:
         The full transcript text.
@@ -76,8 +76,8 @@ def transcribe(mp3_path: str) -> str:
     """
     try:
         model = _get_model()
-        print(f"[whisper_service] Transcribing: {mp3_path}")
-        result = model.transcribe(mp3_path, fp16=False)  # fp16=False for CPU/M1 safety
+        print(f"[whisper_service] Transcribing: {audio_path}")
+        result = model.transcribe(audio_path, fp16=False)  # fp16=False for CPU/M1 safety
         transcript = result.get("text", "").strip()
         print(f"[whisper_service] Done. Transcript length: {len(transcript)} chars")
         return transcript

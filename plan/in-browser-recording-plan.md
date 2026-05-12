@@ -344,11 +344,11 @@ Update the label from "Your Answer (MP3)" to "Your Answer (Audio)" since we now 
 ## Build Phases
 
 ### Phase 1 — Backend: Multi-Format Support
-- [ ] Update `file_handler.py` — accept `audio/*` formats, preserve file extension
-- [ ] Update `delete_temp()` — glob-based cleanup for any extension
-- [ ] Update `whisper_service.py` — rename `mp3_path` → `audio_path`
-- [ ] Update `analyze.py` — rename session key to `audio_path`
-- [ ] Test: upload a `.webm` file via curl → verify Whisper transcribes it correctly
+- [x] Update `file_handler.py` — accept `audio/*` formats, preserve file extension
+- [x] Update `delete_temp()` — glob-based cleanup for any extension
+- [x] Update `whisper_service.py` — rename `mp3_path` → `audio_path`
+- [x] Update `analyze.py` — rename session key to `audio_path`
+- [x] Test: upload a `.webm` file via curl → verify Whisper transcribes it correctly
 
 ### Phase 2 — Frontend: useAudioRecorder Hook
 - [ ] Create `frontend/src/hooks/useAudioRecorder.ts`
