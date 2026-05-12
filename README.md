@@ -10,7 +10,7 @@
 ## ✨ What It Does
 
 1. You paste the **exact interview question** you were asked
-2. You upload your **MP3 answer** (recorded explanation)
+2. You **record your answer** directly in the browser OR upload an audio file (MP3, WAV, M4A, OGG)
 3. The app **transcribes** your audio using OpenAI Whisper (runs locally)
 4. It sends the **transcript + question** to **Gemini API** for structured feedback
 5. If Gemini fails or is unavailable → automatically **retries**, then **falls back to Ollama llama3.2** (local)
@@ -29,8 +29,8 @@ interview-coach/
 │   ├── routers/
 │   │   └── analyze.py          # API route handlers
 │   ├── services/
-│   │   ├── whisper_service.py  # MP3 → transcript  (Phase 2)
-│   │   └── feedback_service.py # transcript → feedback via Gemini (primary) / Ollama (fallback) + retry  (Phase 2)
+│   │   ├── whisper_service.py  # MP3 → transcript
+│   │   └── feedback_service.py # transcript → feedback via Gemini (primary) / Ollama (fallback) + retry
 │   ├── models/
 │   │   └── schemas.py          # Pydantic request/response models
 │   ├── utils/
@@ -38,9 +38,9 @@ interview-coach/
 │   ├── temp/                   # Auto-created: temp MP3 uploads
 │   └── reports/                # Auto-created: saved .txt feedback reports
 │
-├── frontend/                   # React + Vite + TailwindCSS  (Phase 5)
+├── frontend/                   # React + Vite + TailwindCSS
 │
-├── interview-coach-implementation-plan.md
+├── plan
 └── README.md
 ```
 
@@ -105,12 +105,12 @@ The API will be running at **http://localhost:8000**
 
 ---
 
-## 🖥️ Frontend Setup *(Phase 5 — coming soon)*
+## 🖥️ Frontend Setup
 
 ```bash
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 The UI will be running at **http://localhost:5173**
@@ -125,7 +125,7 @@ Open **3 terminal tabs**:
 |-----|---------|---------|
 | 1 | `ollama serve` | Run the Ollama fallback LLM |
 | 2 | `cd backend && source venv/bin/activate && uvicorn main:app --reload --port 8000` | Run the API |
-| 3 | `cd frontend && npm run dev` | Run the UI *(Phase 5)* |
+| 3 | `cd frontend && pnpm dev` | Run the UI |
 
 > Tab 1 (Ollama) is only strictly needed if Gemini is unavailable, but it's good practice to keep it running.
 
@@ -136,11 +136,14 @@ Open **3 terminal tabs**:
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/health` | Health check |
-| `POST` | `/api/analyze` | Upload MP3 + question → returns `session_id` |
+| `POST` | `/api/analyze` | Upload audio + question → returns `session_id` |
 | `GET` | `/api/progress/{session_id}` | SSE stream of pipeline steps |
 | `GET` | `/api/feedback/{session_id}` | Get structured feedback JSON |
 | `GET` | `/api/report/{session_id}` | Download `.txt` feedback report |
 | `DELETE` | `/api/cleanup/{session_id}` | Remove session data + temp files |
+| `GET` | `/api/sessions` | List session history (with search/sort) |
+| `GET` | `/api/sessions/{session_id}` | Get full session details |
+| `DELETE` | `/api/sessions/{session_id}` | Delete a session from history |
 
 ### Test the upload endpoint with curl
 ```bash
@@ -156,25 +159,12 @@ Interactive API docs available at **http://localhost:8000/docs**
 
 ---
 
-## 🏗️ Build Phases
-
-| Phase | Description | Status |
-|-------|-------------|--------|
-| **Phase 1** | Backend foundation — FastAPI, file upload, folder structure | ✅ Done |
-| **Phase 2** | AI pipeline — Whisper + Gemini feedback (Ollama fallback + retry) | 🔜 Next |
-| **Phase 3** | SSE progress streaming (incl. retrying events) | 🔜 |
-| **Phase 4** | Report saving + file download | 🔜 |
-| **Phase 5** | React + Vite frontend | 🔜 |
-| **Phase 6** | Polish, error handling (both providers), mobile layout | 🔜 |
-
----
-
 ## 🧠 AI Models Used
 
 | Task | Model | Provider | Notes |
 |------|-------|----------|-------|
-| Audio transcription | `openai/whisper-base` | Local Python library | Always local |
-| Answer feedback | `gemini-1.5-flash` | Google Gemini API | Primary — needs `GEMINI_API_KEY` |
+| Audio transcription | `openai/whisper-base` | Local Python library | Always local — supports MP3, WAV, M4A, OGG |
+| Answer feedback | `gemini-3-flash-preview` | Google Gemini API | Primary — needs `GEMINI_API_KEY` |
 | Answer feedback (fallback) | `llama3.2` | Ollama (local) | Triggered when Gemini fails/unavailable |
 
 **Retry mechanism:** Gemini is retried up to `MAX_RETRIES` times before falling back to Ollama. Ollama is also retried before raising a final error. Both values are configurable in `backend/.env`.
@@ -217,10 +207,8 @@ SCORES
 
 ## 🔮 V2 Roadmap
 
-- 🎥 Video / screen recording upload (MP4)
-- 📚 Session history and past feedback review
 - 🔐 User accounts and personal dashboard
 - 📊 Score trends over time
-- 🎙️ In-browser audio recording (no upload needed)
 - 🔤 Filler word detection (um, uh, like...)
 - ⏱️ Speaking pace analysis (words per minute)
+
