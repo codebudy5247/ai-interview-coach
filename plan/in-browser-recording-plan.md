@@ -344,33 +344,33 @@ Update the label from "Your Answer (MP3)" to "Your Answer (Audio)" since we now 
 ## Build Phases
 
 ### Phase 1 — Backend: Multi-Format Support
-- [ ] Update `file_handler.py` — accept `audio/*` formats, preserve file extension
-- [ ] Update `delete_temp()` — glob-based cleanup for any extension
-- [ ] Update `whisper_service.py` — rename `mp3_path` → `audio_path`
-- [ ] Update `analyze.py` — rename session key to `audio_path`
-- [ ] Test: upload a `.webm` file via curl → verify Whisper transcribes it correctly
+- [x] Update `file_handler.py` — accept `audio/*` formats, preserve file extension
+- [x] Update `delete_temp()` — glob-based cleanup for any extension
+- [x] Update `whisper_service.py` — rename `mp3_path` → `audio_path`
+- [x] Update `analyze.py` — rename session key to `audio_path`
+- [x] Test: upload a `.webm` file via curl → verify Whisper transcribes it correctly
 
 ### Phase 2 — Frontend: useAudioRecorder Hook
-- [ ] Create `frontend/src/hooks/useAudioRecorder.ts`
-- [ ] Implement `startRecording()`, `stopRecording()`, `resetRecording()`
-- [ ] Handle mic permission denied error
-- [ ] Auto-stop at max duration (10 min)
-- [ ] Cleanup: stop tracks + revoke object URLs on unmount
+- [x] Create `frontend/src/hooks/useAudioRecorder.ts`
+- [x] Implement `startRecording()`, `stopRecording()`, `resetRecording()`
+- [x] Handle mic permission denied error
+- [x] Auto-stop at max duration (10 min)
+- [x] Cleanup: stop tracks + revoke object URLs on unmount
 
 ### Phase 3 — Frontend: AudioUploader Refactor
-- [ ] Add tab UI (Upload / Record) to `AudioUploader.tsx`
-- [ ] "Upload" tab: existing drag & drop (loosen to accept all audio formats)
-- [ ] "Record" tab: integrate `useAudioRecorder` hook
-- [ ] Recording states: idle → recording (red dot + timer) → done (playback + re-record)
-- [ ] Both tabs produce a `File` object via the same `onFileChange` prop
-- [ ] Update `UploadPage.tsx` label
+- [x] Add tab UI (Upload / Record) to `AudioUploader.tsx`
+- [x] "Upload" tab: existing drag & drop (loosen to accept all audio formats)
+- [x] "Record" tab: integrate `useAudioRecorder` hook
+- [x] Recording states: idle → recording (red dot + timer) → done (playback + re-record)
+- [x] Both tabs produce a `File` object via the same `onFileChange` prop
+- [x] Update `UploadPage.tsx` label
 
 ### Phase 4 — Polish & Edge Cases
-- [ ] Mic permission denied → clear error message + instructions
-- [ ] Browser compatibility: test Chrome, Firefox, Safari
-- [ ] Recording too short (< 1s) → show warning
-- [ ] Responsive layout for the tabbed UI
-- [ ] Smooth transitions between recording states
+- [x] Mic permission denied → clear error message + instructions
+- [x] Browser compatibility: test Chrome, Firefox, Safari
+- [x] Recording too short (< 1s) → show warning
+- [x] Responsive layout for the tabbed UI
+- [x] Smooth transitions between recording states
 
 ---
 

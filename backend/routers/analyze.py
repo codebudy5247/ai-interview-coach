@@ -4,7 +4,7 @@ routers/analyze.py
 All API route handlers for the interview-coach pipeline.
 
 Endpoints:
-  POST   /api/analyze              — Upload MP3 + question → start pipeline → return session_id
+  POST   /api/analyze              — Upload audio + question → start pipeline → return session_id
   GET    /api/progress/{session_id} — SSE stream of pipeline progress events
   GET    /api/feedback/{session_id} — Return stored feedback JSON
   DELETE /api/cleanup/{session_id}  — Remove temp files + session data
@@ -65,16 +65,16 @@ def _run_pipeline(session_id: str) -> None:
     endpoint can return immediately with the session_id.
 
     Steps:
-      1. Transcribe MP3 with Whisper
+      1. Transcribe audio with Whisper
       2. Generate feedback via Gemini → Ollama fallback (with retries)
       3. Store results in _sessions[session_id]
-      4. Clean up temp MP3
+      4. Clean up temp audio file
     """
     session = _sessions.get(session_id)
     if session is None:
         return
 
-    mp3_path = session["mp3_path"]
+    audio_path = session["audio_path"]
     question = session["question"]
 
     # Track imagekit file_id for cleanup if pipeline fails after upload
@@ -85,7 +85,7 @@ def _run_pipeline(session_id: str) -> None:
         _sessions[session_id]["status"] = "transcribing"
         _emit_sse(session_id, "transcribing", "in_progress", "Transcribing your audio...")
         print(f"[pipeline:{session_id[:8]}] Transcribing...")
-        transcript = transcribe(mp3_path)
+        transcript = transcribe(audio_path)
         _sessions[session_id]["transcript"] = transcript
         _emit_sse(session_id, "transcribing", "done", "Transcription complete")
         print(f"[pipeline:{session_id[:8]}] Transcription done.")
@@ -94,8 +94,10 @@ def _run_pipeline(session_id: str) -> None:
         _sessions[session_id]["status"] = "uploading_audio"
         _emit_sse(session_id, "uploading_audio", "in_progress", "Uploading audio to cloud...")
         print(f"[pipeline:{session_id[:8]}] Uploading audio to ImageKit...")
-        file_name = f"{session_id}.mp3"
-        upload_result = upload_audio(mp3_path, file_name)
+        
+        import os
+        file_name = f"{session_id}{os.path.splitext(audio_path)[1]}"
+        upload_result = upload_audio(audio_path, file_name)
         audio_url = upload_result["url"]
         imagekit_file_id = upload_result["file_id"]
         _sessions[session_id]["audio_url"] = audio_url
@@ -163,9 +165,9 @@ def _run_pipeline(session_id: str) -> None:
         _emit_sse(session_id, "error", "error", f"Pipeline failed: {exc}")
 
     finally:
-        # --- Step 4: Clean up temp MP3 ---
+        # --- Step 4: Clean up temp audio ---
         delete_temp(session_id)
-        print(f"[pipeline:{session_id[:8]}] Temp MP3 deleted.")
+        print(f"[pipeline:{session_id[:8]}] Temp audio deleted.")
 
 
 # ---------------------------------------------------------------------------
@@ -178,20 +180,20 @@ async def analyze(
     audio: UploadFile = File(...),
 ):
     """
-    - Save the uploaded MP3 to temp/
+    - Save the uploaded audio file to temp/
     - Register the session
     - Kick off the AI pipeline in a background thread
     - Return session_id immediately
     """
     session_id = str(uuid.uuid4())
 
-    # Save MP3
-    mp3_path = await save_upload(audio, session_id)
+    # Save Audio
+    audio_path = await save_upload(audio, session_id)
 
     # Register session
     _sessions[session_id] = {
         "question": question,
-        "mp3_path": str(mp3_path),
+        "audio_path": str(audio_path),
         "status": "uploaded",
         "feedback": None,
         "transcript": None,
@@ -311,7 +313,7 @@ async def get_status(session_id: str):
 # ---------------------------------------------------------------------------
 @router.delete("/cleanup/{session_id}", response_model=CleanupResponse)
 async def cleanup(session_id: str):
-    """Remove temp MP3 and session data."""
+    """Remove temp audio and session data."""
     delete_temp(session_id)
     _sessions.pop(session_id, None)
     return CleanupResponse(success=True)
