@@ -95,10 +95,10 @@ export default function UploadPage() {
           {!canSubmit && !loading && (
             <p className="text-xs text-slate-500 text-center -mt-3">
               {!question.trim() && !audioFile
-                ? 'Add your question and an MP3 to continue'
+                ? 'Add your question and an audio file to continue'
                 : !question.trim()
                 ? 'Please enter the interview question'
-                : 'Please upload an MP3 file'}
+                : 'Please provide an audio file'}
             </p>
           )}
         </form>
