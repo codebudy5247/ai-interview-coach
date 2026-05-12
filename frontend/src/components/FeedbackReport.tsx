@@ -67,6 +67,7 @@ export default function FeedbackReport({
   onDownload,
   onRestart,
 }: FeedbackReportProps) {
+  console.log(feedback.audio_url);
   return (
     <div className="flex flex-col gap-6">
       {/* ── Overall Score ── */}
@@ -145,7 +146,10 @@ export default function FeedbackReport({
         </Section>
 
         <Section id="section-transcript" emoji="📝" title="Your Transcript">
-          <p className="text-sm text-slate-400 leading-relaxed italic">
+          {feedback.audio_url && (
+            <audio controls src={feedback.audio_url} className="w-full" />
+          )}
+          <p className="text-sm text-slate-400 leading-relaxed italic mb-3 mt-5">
             "{feedback.transcript}"
           </p>
         </Section>

@@ -19,6 +19,7 @@ class FeedbackResponse(BaseModel):
     improvements: List[str]
     ideal_answer: str
     transcript: str                    # original Whisper transcript
+    audio_url: Optional[str] = None
 
 
 class SSEEvent(BaseModel):

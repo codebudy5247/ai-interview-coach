@@ -7,7 +7,6 @@ Endpoints:
   POST   /api/analyze              — Upload MP3 + question → start pipeline → return session_id
   GET    /api/progress/{session_id} — SSE stream of pipeline progress events
   GET    /api/feedback/{session_id} — Return stored feedback JSON
-  GET    /api/report/{session_id}   — Download .txt feedback report
   DELETE /api/cleanup/{session_id}  — Remove temp files + session data
 """
 
@@ -24,12 +23,10 @@ from models.schemas import AnalyzeResponse, CleanupResponse, SSEEvent
 from utils.file_handler import (
     save_upload,
     delete_temp,
-    get_report_path,
-    format_feedback_txt,
-    save_report_txt,
 )
 from services.whisper_service import transcribe
 from services.feedback_service import get_feedback, FeedbackServiceError
+from services.imagekit_service import upload_audio, delete_audio
 from database import SessionLocal
 from models.session_model import InterviewSession
 
@@ -80,6 +77,9 @@ def _run_pipeline(session_id: str) -> None:
     mp3_path = session["mp3_path"]
     question = session["question"]
 
+    # Track imagekit file_id for cleanup if pipeline fails after upload
+    imagekit_file_id = None
+
     try:
         # --- Step 1: Transcribe ---
         _sessions[session_id]["status"] = "transcribing"
@@ -90,6 +90,19 @@ def _run_pipeline(session_id: str) -> None:
         _emit_sse(session_id, "transcribing", "done", "Transcription complete")
         print(f"[pipeline:{session_id[:8]}] Transcription done.")
 
+        # --- Step 1b: Upload audio to ImageKit (Phase 2) ---
+        _sessions[session_id]["status"] = "uploading_audio"
+        _emit_sse(session_id, "uploading_audio", "in_progress", "Uploading audio to cloud...")
+        print(f"[pipeline:{session_id[:8]}] Uploading audio to ImageKit...")
+        file_name = f"{session_id}.mp3"
+        upload_result = upload_audio(mp3_path, file_name)
+        audio_url = upload_result["url"]
+        imagekit_file_id = upload_result["file_id"]
+        _sessions[session_id]["audio_url"] = audio_url
+        _sessions[session_id]["imagekit_file_id"] = imagekit_file_id
+        _emit_sse(session_id, "uploading_audio", "done", "Audio uploaded to cloud")
+        print(f"[pipeline:{session_id[:8]}] Audio uploaded → {audio_url}")
+
         # --- Step 2: Generate feedback ---
         _sessions[session_id]["status"] = "analyzing"
         _emit_sse(session_id, "analyzing", "in_progress", "Analyzing with AI...")
@@ -99,23 +112,15 @@ def _run_pipeline(session_id: str) -> None:
             _emit_sse(session_id, "analyzing", status, message)
 
         feedback = get_feedback(question, transcript, on_status=feedback_status_callback)
-        # Attach transcript to feedback so /api/feedback returns it too
+        # Attach transcript and audio_url to feedback so /api/feedback returns it too
         feedback["transcript"] = transcript
+        feedback["audio_url"] = audio_url
+        feedback["imagekit_file_id"] = imagekit_file_id
         _sessions[session_id]["feedback"] = feedback
         _emit_sse(session_id, "analyzing", "done", "Feedback generated")
         print(f"[pipeline:{session_id[:8]}] Feedback ready.")
 
-        # --- Step 3: Save .txt report (Phase 4) ---
-        _sessions[session_id]["status"] = "saving_report"
-        _emit_sse(session_id, "saving_report", "in_progress", "Saving feedback report...")
-        print(f"[pipeline:{session_id[:8]}] Saving feedback report...")
-        formatted = format_feedback_txt(feedback, question, transcript, session_id)
-        report_path = save_report_txt(formatted, session_id)
-        _sessions[session_id]["report_path"] = str(report_path)
-        _emit_sse(session_id, "saving_report", "done", "Report saved")
-        print(f"[pipeline:{session_id[:8]}] Report saved → {report_path}")
-
-        # --- Step 3b: Persist to database ---
+        # --- Step 3: Persist to database ---
         _sessions[session_id]["status"] = "persisting"
         _emit_sse(session_id, "persisting", "in_progress", "Saving to history...")
         print(f"[pipeline:{session_id[:8]}] Persisting session to database...")
@@ -139,12 +144,20 @@ def _run_pipeline(session_id: str) -> None:
 
     except FeedbackServiceError as exc:
         print(f"[pipeline:{session_id[:8]}] FeedbackServiceError: {exc}")
+        # Rollback: delete uploaded audio if ImageKit upload succeeded
+        if imagekit_file_id:
+            print(f"[pipeline:{session_id[:8]}] Rolling back: deleting audio from ImageKit...")
+            delete_audio(imagekit_file_id)
         _sessions[session_id]["status"] = "error"
         _sessions[session_id]["error"] = str(exc)
         _emit_sse(session_id, "error", "error", str(exc))
 
     except Exception as exc:
         print(f"[pipeline:{session_id[:8]}] Unexpected error: {exc}")
+        # Rollback: delete uploaded audio if ImageKit upload succeeded
+        if imagekit_file_id:
+            print(f"[pipeline:{session_id[:8]}] Rolling back: deleting audio from ImageKit...")
+            delete_audio(imagekit_file_id)
         _sessions[session_id]["status"] = "error"
         _sessions[session_id]["error"] = f"Pipeline failed: {exc}"
         _emit_sse(session_id, "error", "error", f"Pipeline failed: {exc}")
@@ -182,7 +195,6 @@ async def analyze(
         "status": "uploaded",
         "feedback": None,
         "transcript": None,
-        "report_path": None,
         "error": None,
         "events": queue.Queue(),
     }
@@ -292,43 +304,6 @@ async def get_status(session_id: str):
         "status": session["status"],
         "error": session.get("error"),
     }
-
-
-# ---------------------------------------------------------------------------
-# GET /api/report/{session_id}
-# ---------------------------------------------------------------------------
-@router.get("/report/{session_id}")
-async def download_report(session_id: str):
-    """
-    Serve the saved .txt feedback report as a file download.
-
-    Returns:
-        200  FileResponse  — report is ready; browser will download it.
-        202  JSON          — pipeline is still running (report not yet saved).
-        500  JSON          — pipeline ended in an error.
-        404  JSON          — session not found or report file missing.
-    """
-    session = get_session(session_id)  # raises 404 if session unknown
-    status = session["status"]
-
-    if status == "error":
-        raise HTTPException(
-            status_code=500,
-            detail=session.get("error", "Pipeline failed — no report generated."),
-        )
-
-    if status != "done":
-        raise HTTPException(
-            status_code=202,
-            detail=f"Report not ready yet. Current status: {status}",
-        )
-
-    path = get_report_path(session_id)  # raises 404 if file missing
-    return FileResponse(
-        path=str(path),
-        media_type="text/plain",
-        filename=f"{session_id[:8]}_feedback.txt",
-    )
 
 
 # ---------------------------------------------------------------------------

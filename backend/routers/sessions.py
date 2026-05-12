@@ -70,6 +70,7 @@ def get_session_detail(session_id: str, db: Session = Depends(get_db)):
         improvements=feedback_data.get("improvements", []),
         ideal_answer=feedback_data.get("ideal_answer", ""),
         transcript=feedback_data.get("transcript", ""),
+        audio_url=feedback_data.get("audio_url"),
     )
 
     return SessionDetail(
@@ -89,15 +90,17 @@ def delete_session(session_id: str, db: Session = Depends(get_db)):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Delete the .txt report file if it exists
-    from utils.file_handler import get_report_path
-    from pathlib import Path
+    # Extract imagekit_file_id from feedback_json and delete remote file
     try:
-        report_path = get_report_path(session_id)
-        if report_path.exists():
-            report_path.unlink()
-    except Exception:
-        pass  # Report file might not exist
+        import json
+        from services.imagekit_service import delete_audio
+        if session.feedback_json:
+            feedback_data = json.loads(session.feedback_json)
+            imagekit_file_id = feedback_data.get("imagekit_file_id")
+            if imagekit_file_id:
+                delete_audio(imagekit_file_id)
+    except Exception as e:
+        print(f"Failed to delete audio from ImageKit: {e}")
 
     db.delete(session)
     db.commit()
