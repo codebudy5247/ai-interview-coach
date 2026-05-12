@@ -7,7 +7,6 @@ Endpoints:
   POST   /api/analyze              — Upload MP3 + question → start pipeline → return session_id
   GET    /api/progress/{session_id} — SSE stream of pipeline progress events
   GET    /api/feedback/{session_id} — Return stored feedback JSON
-  GET    /api/report/{session_id}   — Download .txt feedback report
   DELETE /api/cleanup/{session_id}  — Remove temp files + session data
 """
 
@@ -24,9 +23,6 @@ from models.schemas import AnalyzeResponse, CleanupResponse, SSEEvent
 from utils.file_handler import (
     save_upload,
     delete_temp,
-    get_report_path,
-    format_feedback_txt,
-    save_report_txt,
 )
 from services.whisper_service import transcribe
 from services.feedback_service import get_feedback, FeedbackServiceError
@@ -119,21 +115,12 @@ def _run_pipeline(session_id: str) -> None:
         # Attach transcript and audio_url to feedback so /api/feedback returns it too
         feedback["transcript"] = transcript
         feedback["audio_url"] = audio_url
+        feedback["imagekit_file_id"] = imagekit_file_id
         _sessions[session_id]["feedback"] = feedback
         _emit_sse(session_id, "analyzing", "done", "Feedback generated")
         print(f"[pipeline:{session_id[:8]}] Feedback ready.")
 
-        # --- Step 3: Save .txt report (Phase 4) ---
-        _sessions[session_id]["status"] = "saving_report"
-        _emit_sse(session_id, "saving_report", "in_progress", "Saving feedback report...")
-        print(f"[pipeline:{session_id[:8]}] Saving feedback report...")
-        formatted = format_feedback_txt(feedback, question, transcript, session_id)
-        report_path = save_report_txt(formatted, session_id)
-        _sessions[session_id]["report_path"] = str(report_path)
-        _emit_sse(session_id, "saving_report", "done", "Report saved")
-        print(f"[pipeline:{session_id[:8]}] Report saved → {report_path}")
-
-        # --- Step 3b: Persist to database ---
+        # --- Step 3: Persist to database ---
         _sessions[session_id]["status"] = "persisting"
         _emit_sse(session_id, "persisting", "in_progress", "Saving to history...")
         print(f"[pipeline:{session_id[:8]}] Persisting session to database...")
@@ -208,7 +195,6 @@ async def analyze(
         "status": "uploaded",
         "feedback": None,
         "transcript": None,
-        "report_path": None,
         "error": None,
         "events": queue.Queue(),
     }
@@ -318,43 +304,6 @@ async def get_status(session_id: str):
         "status": session["status"],
         "error": session.get("error"),
     }
-
-
-# ---------------------------------------------------------------------------
-# GET /api/report/{session_id}
-# ---------------------------------------------------------------------------
-@router.get("/report/{session_id}")
-async def download_report(session_id: str):
-    """
-    Serve the saved .txt feedback report as a file download.
-
-    Returns:
-        200  FileResponse  — report is ready; browser will download it.
-        202  JSON          — pipeline is still running (report not yet saved).
-        500  JSON          — pipeline ended in an error.
-        404  JSON          — session not found or report file missing.
-    """
-    session = get_session(session_id)  # raises 404 if session unknown
-    status = session["status"]
-
-    if status == "error":
-        raise HTTPException(
-            status_code=500,
-            detail=session.get("error", "Pipeline failed — no report generated."),
-        )
-
-    if status != "done":
-        raise HTTPException(
-            status_code=202,
-            detail=f"Report not ready yet. Current status: {status}",
-        )
-
-    path = get_report_path(session_id)  # raises 404 if file missing
-    return FileResponse(
-        path=str(path),
-        media_type="text/plain",
-        filename=f"{session_id[:8]}_feedback.txt",
-    )
 
 
 # ---------------------------------------------------------------------------
