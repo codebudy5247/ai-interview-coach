@@ -2,11 +2,14 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import QuestionInput from '../components/QuestionInput'
 import AudioUploader from '../components/AudioUploader'
+import CodeSnippetInput from '../components/CodeSnippetInput'
 import { analyzeAnswer } from '../services/api'
 
 export default function UploadPage() {
   const navigate = useNavigate()
   const [question, setQuestion] = useState('')
+  const [codeSnippet, setCodeSnippet] = useState('')
+  const [codeLanguage, setCodeLanguage] = useState('auto')
   const [audioFile, setAudioFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -21,7 +24,12 @@ export default function UploadPage() {
     setSubmitError(null)
 
     try {
-      const { session_id } = await analyzeAnswer(question.trim(), audioFile!)
+      const { session_id } = await analyzeAnswer(
+        question.trim(), 
+        audioFile!, 
+        codeSnippet, 
+        codeLanguage
+      )
       navigate(`/progress/${session_id}`)
     } catch (err: unknown) {
       const msg =
@@ -62,6 +70,14 @@ export default function UploadPage() {
           <QuestionInput
             value={question}
             onChange={setQuestion}
+            disabled={loading}
+          />
+
+          <CodeSnippetInput
+            code={codeSnippet}
+            language={codeLanguage}
+            onCodeChange={setCodeSnippet}
+            onLanguageChange={setCodeLanguage}
             disabled={loading}
           />
 

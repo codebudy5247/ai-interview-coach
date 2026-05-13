@@ -20,6 +20,8 @@ class FeedbackResponse(BaseModel):
     ideal_answer: str
     transcript: str                    # original Whisper transcript
     audio_url: Optional[str] = None
+    code_snippet: Optional[str] = None
+    code_language: Optional[str] = None
 
 
 class SSEEvent(BaseModel):

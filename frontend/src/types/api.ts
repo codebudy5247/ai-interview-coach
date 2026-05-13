@@ -19,6 +19,8 @@ export interface FeedbackResponse {
   ideal_answer: string
   transcript: string
   audio_url?: string
+  code_snippet?: string
+  code_language?: string
 }
 
 export interface SSEEvent {

@@ -11,4 +11,6 @@ class InterviewSession(Base):
     transcript = Column(Text, nullable=False)
     overall_score = Column(Integer, nullable=False)
     feedback_json = Column(Text, nullable=False)  # Full feedback as JSON string
+    code_snippet = Column(Text, nullable=True)
+    code_language = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

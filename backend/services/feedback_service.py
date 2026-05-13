@@ -71,7 +71,12 @@ class FeedbackServiceError(Exception):
 # ---------------------------------------------------------------------------
 # Prompt builder
 # ---------------------------------------------------------------------------
-def build_prompt(question: str, transcript: str) -> str:
+def build_prompt(
+    question: str, 
+    transcript: str, 
+    code_snippet: str | None = None, 
+    code_language: str | None = None
+) -> str:
     """
     Build the evaluation prompt used by Gemini / Ollama.
 
@@ -93,6 +98,17 @@ def build_prompt(question: str, transcript: str) -> str:
         f"  - {dim} (1-10): {desc}" for dim, desc in RUBRIC.items()
     )
     schema = json.dumps(_EXAMPLE_OUTPUT, indent=2)
+    
+    code_section = ""
+    if code_snippet and code_snippet.strip():
+        lang = code_language or ""
+        code_section = dedent(f"""
+            ## Code Snippet Under Discussion
+            The interviewer provided this code for the candidate to discuss:
+            ```{lang}
+            {code_snippet}
+            ```
+        """)
 
     return dedent(f"""
         You are a senior software engineer conducting mock technical interviews.
@@ -100,7 +116,7 @@ def build_prompt(question: str, transcript: str) -> str:
 
         ## Interview Question
         {question.strip()}
-
+{code_section}
         ## Candidate's Answer (transcribed from audio)
         {transcript.strip()}
 
@@ -208,6 +224,8 @@ def _call_ollama(prompt: str) -> dict:
 def get_feedback(
     question: str,
     transcript: str,
+    code_snippet: str | None = None,
+    code_language: str | None = None,
     on_status: callable = None,
 ) -> dict:
     """
@@ -231,7 +249,7 @@ def get_feedback(
     Raises:
         FeedbackServiceError: When all providers and all retries are exhausted.
     """
-    prompt = build_prompt(question, transcript)
+    prompt = build_prompt(question, transcript, code_snippet, code_language)
 
     # --- PRIMARY: Gemini ---
     if GEMINI_API_KEY:

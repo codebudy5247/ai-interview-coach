@@ -76,6 +76,8 @@ def _run_pipeline(session_id: str) -> None:
 
     audio_path = session["audio_path"]
     question = session["question"]
+    code_snippet = session.get("code_snippet")
+    code_language = session.get("code_language")
 
     # Track imagekit file_id for cleanup if pipeline fails after upload
     imagekit_file_id = None
@@ -113,11 +115,19 @@ def _run_pipeline(session_id: str) -> None:
         def feedback_status_callback(provider: str, attempt: int, status: str, message: str):
             _emit_sse(session_id, "analyzing", status, message)
 
-        feedback = get_feedback(question, transcript, on_status=feedback_status_callback)
+        feedback = get_feedback(
+            question, 
+            transcript, 
+            code_snippet=code_snippet, 
+            code_language=code_language, 
+            on_status=feedback_status_callback
+        )
         # Attach transcript and audio_url to feedback so /api/feedback returns it too
         feedback["transcript"] = transcript
         feedback["audio_url"] = audio_url
         feedback["imagekit_file_id"] = imagekit_file_id
+        feedback["code_snippet"] = code_snippet
+        feedback["code_language"] = code_language
         _sessions[session_id]["feedback"] = feedback
         _emit_sse(session_id, "analyzing", "done", "Feedback generated")
         print(f"[pipeline:{session_id[:8]}] Feedback ready.")
@@ -134,6 +144,8 @@ def _run_pipeline(session_id: str) -> None:
                 transcript=transcript,
                 overall_score=feedback["overall_score"],
                 feedback_json=json.dumps(feedback),
+                code_snippet=code_snippet,
+                code_language=code_language,
             )
             db.add(db_session)
             db.commit()
@@ -178,6 +190,8 @@ async def analyze(
     background_tasks: BackgroundTasks,
     question: str = Form(...),
     audio: UploadFile = File(...),
+    code_snippet: str = Form(None),
+    code_language: str = Form(None),
 ):
     """
     - Save the uploaded audio file to temp/
@@ -190,10 +204,14 @@ async def analyze(
     # Save Audio
     audio_path = await save_upload(audio, session_id)
 
+    code_snippet = code_snippet.strip() if code_snippet and code_snippet.strip() else None
+
     # Register session
     _sessions[session_id] = {
         "question": question,
         "audio_path": str(audio_path),
+        "code_snippet": code_snippet,
+        "code_language": code_language,
         "status": "uploaded",
         "feedback": None,
         "transcript": None,
