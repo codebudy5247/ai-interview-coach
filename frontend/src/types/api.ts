@@ -17,8 +17,11 @@ export interface FeedbackResponse {
   what_was_missed: string[]
   improvements: string[]
   ideal_answer: string
+  ideal_code?: string
   transcript: string
   audio_url?: string
+  code_snippet?: string
+  code_language?: string
 }
 
 export interface SSEEvent {

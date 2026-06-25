@@ -154,10 +154,28 @@ export default function FeedbackReport({
           </p>
         </Section>
 
+        {feedback.code_snippet && (
+          <Section id="section-code" emoji="💻" title="Code Snippet">
+            {feedback.code_language && feedback.code_language !== 'auto' && (
+              <span className="text-xs text-slate-500 mb-2 block uppercase tracking-wider">
+                {feedback.code_language}
+              </span>
+            )}
+            <pre className="text-sm text-slate-300 bg-slate-800 rounded-lg p-4 overflow-x-auto font-mono">
+              <code>{feedback.code_snippet}</code>
+            </pre>
+          </Section>
+        )}
+
         <Section id="section-ideal" emoji="🏆" title="Ideal Answer">
-          <p className="text-sm text-slate-300 leading-relaxed">
+          <p className="text-sm text-slate-300 leading-relaxed mb-3">
             {feedback.ideal_answer}
           </p>
+          {feedback.ideal_code && (
+            <pre className="text-sm text-slate-300 bg-slate-800 rounded-lg p-4 overflow-x-auto font-mono mt-3 border border-slate-700/50">
+              <code>{feedback.ideal_code}</code>
+            </pre>
+          )}
         </Section>
       </div>
 

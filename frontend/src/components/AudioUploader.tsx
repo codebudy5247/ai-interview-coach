@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 
 interface AudioUploaderProps {

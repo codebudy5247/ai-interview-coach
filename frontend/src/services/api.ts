@@ -10,10 +10,20 @@ const http = axios.create({ baseURL: '/api' })
 export async function analyzeAnswer(
   question: string,
   audioFile: File,
+  codeSnippet?: string,
+  codeLanguage?: string,
 ): Promise<AnalyzeResponse> {
   const form = new FormData()
   form.append('question', question)
   form.append('audio', audioFile)
+  
+  if (codeSnippet?.trim()) {
+    form.append('code_snippet', codeSnippet)
+    if (codeLanguage && codeLanguage !== 'auto') {
+      form.append('code_language', codeLanguage)
+    }
+  }
+  
   const { data } = await http.post<AnalyzeResponse>('/analyze', form)
   return data
 }
