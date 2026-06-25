@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Interview Coach is an AI-powered mock interview practice tool. Users upload an MP3 of their interview answer, and the app transcribes it using Whisper, then analyzes it using Gemini API (primary) with automatic Ollama llama3.2 fallback (local, offline-safe). Audio files are stored via ImageKit for cloud storage.
+Interview Coach is an AI-powered mock interview practice tool. Users upload an MP3 of their interview answer, and the app transcribes it using Whisper, then analyzes it using Azure OpenAI (primary) with automatic Gemini API fallback. Audio files are stored via ImageKit for cloud storage.
 
 ## Running the Project
 
@@ -12,12 +12,9 @@ Interview Coach is an AI-powered mock interview practice tool. Users upload an M
 ```bash
 # Install FFmpeg (required by Whisper)
 brew install ffmpeg
-
-# Install and start Ollama (fallback provider)
-brew install ollama
-ollama serve
-ollama pull llama3.2
 ```
+
+Feedback runs on cloud providers (Azure OpenAI primary, Gemini fallback) — no local LLM to install. Configure keys in `backend/.env` (see `.env.example`).
 
 ### Backend
 ```bash
@@ -44,7 +41,7 @@ UI runs at http://localhost:5173
 - **routers/analyze.py**: Core API endpoints (`/api/analyze`, `/api/progress`, `/api/feedback`, `/api/cleanup`)
 - **routers/sessions.py**: Session history management
 - **services/whisper_service.py**: Audio transcription using OpenAI Whisper
-- **services/feedback_service.py**: AI feedback generation with Gemini → Ollama fallback + retry logic
+- **services/feedback_service.py**: AI feedback generation with Azure OpenAI → Gemini fallback + retry logic
 - **services/imagekit_service.py**: ImageKit integration for audio file storage
 - **utils/file_handler.py**: File upload/save, report generation, temp file cleanup
 - **models/schemas.py**: Pydantic request/response models
@@ -79,10 +76,12 @@ UI runs at http://localhost:5173
 ## Key Configuration
 
 API keys are stored in `backend/.env`:
-- `GEMINI_API_KEY`: Primary AI provider (get from https://aistudio.google.com/app/apikey)
-- `GEMINI_MODEL`: Defaults to `gemini-1.5-flash`
-- `OLLAMA_MODEL`: Fallback model, defaults to `llama3.2`
-- `MAX_RETRIES`: Gemini retry count before fallback
+- `AZURE_OPENAI_API_KEY`: Primary AI provider key. Blank → skip Azure, use Gemini directly
+- `AZURE_OPENAI_ENDPOINT`: e.g. `https://<resource>.openai.azure.com`
+- `AZURE_OPENAI_DEPLOYMENT`: chat model deployment name
+- `AZURE_OPENAI_API_VERSION`: Defaults to `2024-10-21`
+- `GEMINI_API_KEY`: Fallback AI provider (get from https://aistudio.google.com/app/apikey)
+- `MAX_RETRIES`: Per-provider retry count before fallback
 - `IMAGEKIT_PUBLIC_KEY`: ImageKit public key (get from https://imagekit.io/dashboard/developer)
 - `IMAGEKIT_PRIVATE_KEY`: ImageKit private key
 - `IMAGEKIT_URL_ENDPOINT`: ImageKit URL endpoint

@@ -52,7 +52,7 @@ export default function ProgressPage() {
           </h1>
           {!done && !pipelineError && (
             <p className="mt-1 text-sm text-slate-500">
-              Usually ~30s with Gemini, 1–2 min with Ollama fallback. Hang tight!
+              Usually ~30s with Azure OpenAI, a bit longer if it falls back to Gemini. Hang tight!
             </p>
           )}
         </div>

@@ -10,3 +10,6 @@ __pycache__/
 node_modules/
 dist/
 .DS_Store
+
+# Playwright MCP test artifacts
+.playwright-mcp/

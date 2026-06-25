@@ -2,16 +2,20 @@
 feedback_service.py
 -------------------
 Generates structured interview feedback using:
-  PRIMARY  → Google Gemini API (gemini-2.0-flash)
-  FALLBACK → Ollama llama3.2 (local)
+  PRIMARY  → Azure OpenAI (chat completions, JSON mode)
+  FALLBACK → Google Gemini API
 
 Each provider is retried up to MAX_RETRIES times before moving to the next.
 If both fail completely, FeedbackServiceError is raised.
 
 Environment variables (loaded from backend/.env):
-  GEMINI_API_KEY   — Gemini API key. Leave blank to skip Gemini and go straight to Ollama.
-  MAX_RETRIES      — Number of attempts per provider (default: 2)
-  RETRY_DELAY      — Seconds between retries (default: 2)
+  AZURE_OPENAI_API_KEY     — Azure OpenAI key. Leave blank to skip Azure and go straight to Gemini.
+  AZURE_OPENAI_ENDPOINT    — e.g. https://<resource>.openai.azure.com
+  AZURE_OPENAI_DEPLOYMENT  — deployment name of the chat model
+  AZURE_OPENAI_API_VERSION — API version (default: 2024-10-21)
+  GEMINI_API_KEY           — Gemini API key (fallback). Leave blank to skip Gemini.
+  MAX_RETRIES              — Number of attempts per provider (default: 2)
+  RETRY_DELAY              — Seconds between retries (default: 2)
 """
 
 import json
@@ -19,44 +23,43 @@ import os
 import re
 import time
 
-import ollama
+from openai import AzureOpenAI
 from google import genai
-from textwrap import dedent
-from google.genai import types
 from dotenv import load_dotenv
+
+from services.prompts import build_prompt
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 load_dotenv()
 
+AZURE_OPENAI_API_KEY: str = os.getenv("AZURE_OPENAI_API_KEY", "").strip()
+AZURE_OPENAI_DEPLOYMENT: str = os.getenv("AZURE_OPENAI_DEPLOYMENT", "").strip()
+AZURE_OPENAI_API_VERSION: str = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21").strip()
+
+
+def _resolve_azure_endpoint() -> str:
+    """
+    Accept either AZURE_OPENAI_ENDPOINT (full URL) or AZURE_OPENAI_RESOURCE_NAME
+    (just the resource, from which the standard endpoint URL is built).
+    """
+    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
+    if endpoint:
+        return endpoint
+    resource = os.getenv("AZURE_OPENAI_RESOURCE_NAME", "").strip()
+    if resource:
+        return f"https://{resource}.openai.azure.com"
+    return ""
+
+
+AZURE_OPENAI_ENDPOINT: str = _resolve_azure_endpoint()
+
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
 MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", "2"))
 RETRY_DELAY: float = float(os.getenv("RETRY_DELAY", "2"))
 
 GEMINI_MODEL = "gemini-3-flash-preview"  # gemini-3.1-flash-lite
-OLLAMA_MODEL = "llama3.2:3b"
-
-# ---------------------------------------------------------------------------
-# Scoring rubric — centralised so it's easy to tune weights / criteria
-# ---------------------------------------------------------------------------
-RUBRIC: dict[str, str] = {
-    "correctness": "Technical accuracy and depth of the answer",
-    "clarity": "How easy the answer is to follow for a non-expert listener",
-    "structure": "Logical flow: opening, body, conclusion (STAR/PREP preferred)",
-    "relevance": "How directly the answer addresses what was actually asked",
-}
-
-# JSON schema shown to the model as a concrete example
-_EXAMPLE_OUTPUT = {
-    "overall_score": 7,
-    "scores": {dim: {"score": 7, "feedback": "..."} for dim in RUBRIC},
-    "what_went_well": ["point 1", "point 2"],
-    "what_was_missed": ["point 1", "point 2"],
-    "improvements": ["actionable suggestion 1", "actionable suggestion 2"],
-    "ideal_answer": "A complete model answer to this question.",
-    "ideal_code": "// Code snippet accompanying the ideal answer, if applicable",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -64,78 +67,6 @@ _EXAMPLE_OUTPUT = {
 # ---------------------------------------------------------------------------
 class FeedbackServiceError(Exception):
     """Raised when all providers exhaust their retries."""
-
-
-# ---------------------------------------------------------------------------
-# Prompt builder
-# ---------------------------------------------------------------------------
-def build_prompt(
-    question: str,
-    transcript: str,
-    code_snippet: str | None = None,
-    code_language: str | None = None,
-) -> str:
-    """
-    Build the evaluation prompt used by Gemini / Ollama.
-
-    Design choices
-    --------------
-    * Role + context up front — LLMs attend more strongly to early tokens.
-    * Explicit rubric with per-dimension guidance keeps scores consistent.
-    * JSON schema is generated programmatically so it stays in sync with RUBRIC.
-    * Negative constraints ("no markdown") are placed right before the output
-      request, where recency makes them most effective.
-    * dedent() removes accidental indentation from the triple-quoted block.
-    """
-    if not question.strip():
-        raise ValueError("question must not be blank")
-    if not transcript.strip():
-        raise ValueError("transcript must not be blank")
-
-    rubric_block = "\n".join(
-        f"  - {dim} (1-10): {desc}" for dim, desc in RUBRIC.items()
-    )
-    schema = json.dumps(_EXAMPLE_OUTPUT, indent=2)
-
-    code_section = ""
-    if code_snippet and code_snippet.strip():
-        lang = code_language or ""
-        code_section = dedent(f"""
-            ## Code Snippet Under Discussion
-            The interviewer provided this code for the candidate to discuss:
-            ```{lang}
-            {code_snippet}
-            ```
-        """)
-
-    return dedent(f"""
-        You are a senior software engineer conducting mock technical interviews.
-        Your role is to give honest, specific, and actionable feedback.
-
-        ## Interview Question
-        {question.strip()}
-{code_section}
-        ## Candidate's Answer (transcribed from audio)
-        {transcript.strip()}
-
-        ## Evaluation Rubric
-        Score each dimension from 1 (poor) to 10 (excellent):
-        {rubric_block}
-
-        ## Instructions
-        - Be strict but fair; a score of 10 requires a near-perfect answer.
-        - Feedback per dimension must be 1-2 concrete sentences, not generic praise.
-        - `what_went_well` and `what_was_missed` should each have 2-4 bullet points.
-        - `improvements` must be specific and actionable (e.g. "Mention Big-O complexity").
-        - `ideal_answer` should be a complete, concise model answer (3-5 sentences).
-        - `ideal_code` should be an accompanying code snippet based on the ideal answer (if applicable to the question, else null/empty string).
-        - `overall_score` is your holistic judgment, NOT a simple average.
-
-        ## Output
-        Return ONLY a valid JSON object. No markdown fences, no commentary.
-
-        {schema}
-    """).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -205,20 +136,47 @@ def _is_quota_exhausted(exc: Exception) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Provider: Ollama
+# Provider: Azure OpenAI
 # ---------------------------------------------------------------------------
-def _call_ollama(prompt: str) -> dict:
+def _call_azure(prompt: str) -> dict:
     """
-    Send the prompt to Ollama (llama3.2) and return the parsed feedback dict.
-    Raises any exception on failure (caller handles retries).
+    Send the prompt to Azure OpenAI (chat completions, JSON mode) and return
+    the parsed feedback dict. Raises any exception on failure (caller handles retries).
     """
-    response = ollama.chat(
-        model=OLLAMA_MODEL,
-        messages=[{"role": "user", "content": prompt}],
+    client = AzureOpenAI(
+        api_key=AZURE_OPENAI_API_KEY,
+        azure_endpoint=AZURE_OPENAI_ENDPOINT,
+        api_version=AZURE_OPENAI_API_VERSION,
     )
-    raw = response["message"]["content"]
-    print(f"[feedback_service] Ollama raw response (first 200 chars): {raw[:200]}")
+    response = client.chat.completions.create(
+        model=AZURE_OPENAI_DEPLOYMENT,
+        messages=[{"role": "user", "content": prompt}],
+        response_format={"type": "json_object"},
+    )
+    raw = response.choices[0].message.content
+    print(f"[feedback_service] Azure raw response (first 200 chars): {raw[:200]}")
     return _parse_json(raw)
+
+
+def _azure_retry_delay(exc: Exception) -> float:
+    """
+    On a 429 rate-limit, honor the API-suggested wait. Azure returns the hint
+    either as a 'retry-after' header or 'Try again in X seconds' in the message.
+    Falls back to the configured RETRY_DELAY otherwise.
+    """
+    # openai.RateLimitError exposes the response headers, including retry-after
+    retry_after = getattr(getattr(exc, "response", None), "headers", {})
+    if retry_after:
+        val = retry_after.get("retry-after")
+        if val:
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                pass
+    match = re.search(r"(?:retry|try again) in (\d+(?:\.\d+)?)\s*s", str(exc), re.IGNORECASE)
+    if match:
+        return float(match.group(1))
+    return RETRY_DELAY
 
 
 # ---------------------------------------------------------------------------
@@ -235,10 +193,9 @@ def get_feedback(
     Generate structured feedback for the given question + transcript.
 
     Provider chain:
-      1. Gemini (gemini-2.0-flash) — skipped if GEMINI_API_KEY is blank
+      1. Azure OpenAI — skipped if AZURE_OPENAI_API_KEY is blank.
          Retried MAX_RETRIES times. On 429 rate-limit, waits the API-suggested delay.
-         On per-day quota exhaustion, skips straight to Ollama.
-      2. Ollama (llama3.2) — local fallback
+      2. Gemini — fallback. Skipped if GEMINI_API_KEY is blank.
          Retried MAX_RETRIES times before raising FeedbackServiceError.
 
     Args:
@@ -254,100 +211,105 @@ def get_feedback(
     """
     prompt = build_prompt(question, transcript, code_snippet, code_language)
 
-    # --- PRIMARY: Gemini ---
-    if GEMINI_API_KEY:
+    # --- PRIMARY: Azure OpenAI ---
+    if AZURE_OPENAI_API_KEY:
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                print(f"[feedback_service] Gemini attempt {attempt}/{MAX_RETRIES}...")
+                print(f"[feedback_service] Azure attempt {attempt}/{MAX_RETRIES}...")
                 if on_status:
                     on_status(
-                        "gemini",
+                        "azure",
                         attempt,
                         "in_progress",
-                        f"Analyzing with Gemini (attempt {attempt})...",
+                        f"Analyzing with Azure OpenAI (attempt {attempt})...",
                     )
-                result = _call_gemini(prompt)
-                print("[feedback_service] Gemini succeeded.")
+                result = _call_azure(prompt)
+                print("[feedback_service] Azure succeeded.")
                 if on_status:
                     on_status(
-                        "gemini", attempt, "done", "Feedback generated via Gemini"
+                        "azure", attempt, "done", "Feedback generated via Azure OpenAI"
                     )
                 return result
             except Exception as exc:
-                print(f"[feedback_service] Gemini attempt {attempt} failed: {exc}")
-                if _is_quota_exhausted(exc):
-                    print(
-                        "[feedback_service] Daily quota exhausted — skipping to Ollama."
-                    )
-                    if on_status:
-                        on_status(
-                            "gemini",
-                            attempt,
-                            "quota_exhausted",
-                            "Daily quota exhausted. Falling back to Ollama...",
-                        )
-                    break
+                print(f"[feedback_service] Azure attempt {attempt} failed: {exc}")
                 if attempt < MAX_RETRIES:
+                    delay = _azure_retry_delay(exc)
                     if on_status:
                         on_status(
-                            "gemini",
+                            "azure",
                             attempt,
                             "retrying",
-                            f"Gemini failed. Retrying in {_gemini_retry_delay(exc)}s...",
+                            f"Azure failed. Retrying in {delay}s...",
                         )
-                    delay = _gemini_retry_delay(exc)
                     time.sleep(delay)
         print(
-            "[feedback_service] Gemini exhausted all retries. Falling back to Ollama..."
+            "[feedback_service] Azure exhausted all retries. Falling back to Gemini..."
+        )
+        if on_status:
+            on_status(
+                "azure",
+                MAX_RETRIES,
+                "fallback",
+                "Azure exhausted retries. Falling back to Gemini...",
+            )
+    else:
+        print(
+            "[feedback_service] AZURE_OPENAI_API_KEY not set — skipping Azure, using Gemini directly."
         )
         if on_status:
             on_status(
                 "gemini",
-                MAX_RETRIES,
-                "fallback",
-                "Gemini exhausted retries. Falling back to Ollama...",
-            )
-    else:
-        print(
-            "[feedback_service] GEMINI_API_KEY not set — skipping Gemini, using Ollama directly."
-        )
-        if on_status:
-            on_status(
-                "ollama",
                 1,
                 "in_progress",
-                "GEMINI_API_KEY not set. Using Ollama directly...",
+                "Azure not configured. Using Gemini directly...",
             )
 
-    # --- FALLBACK: Ollama llama3.2 ---
+    # --- FALLBACK: Gemini ---
+    if not GEMINI_API_KEY:
+        raise FeedbackServiceError(
+            "Azure OpenAI failed (or is not configured) and GEMINI_API_KEY is not set. "
+            "Configure at least one provider in backend/.env."
+        )
+
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            print(f"[feedback_service] Ollama attempt {attempt}/{MAX_RETRIES}...")
+            print(f"[feedback_service] Gemini attempt {attempt}/{MAX_RETRIES}...")
             if on_status:
                 on_status(
-                    "ollama",
+                    "gemini",
                     attempt,
                     "in_progress",
-                    f"Analyzing with Ollama (attempt {attempt})...",
+                    f"Analyzing with Gemini (attempt {attempt})...",
                 )
-            result = _call_ollama(prompt)
-            print("[feedback_service] Ollama succeeded.")
+            result = _call_gemini(prompt)
+            print("[feedback_service] Gemini succeeded.")
             if on_status:
-                on_status("ollama", attempt, "done", "Feedback generated via Ollama")
+                on_status("gemini", attempt, "done", "Feedback generated via Gemini")
             return result
         except Exception as exc:
-            print(f"[feedback_service] Ollama attempt {attempt} failed: {exc}")
-            if attempt < MAX_RETRIES:
+            print(f"[feedback_service] Gemini attempt {attempt} failed: {exc}")
+            if _is_quota_exhausted(exc):
+                print("[feedback_service] Daily quota exhausted — no providers left.")
                 if on_status:
                     on_status(
-                        "ollama",
+                        "gemini",
+                        attempt,
+                        "quota_exhausted",
+                        "Gemini daily quota exhausted.",
+                    )
+                break
+            if attempt < MAX_RETRIES:
+                delay = _gemini_retry_delay(exc)
+                if on_status:
+                    on_status(
+                        "gemini",
                         attempt,
                         "retrying",
-                        f"Ollama failed. Retrying in {RETRY_DELAY}s...",
+                        f"Gemini failed. Retrying in {delay}s...",
                     )
-                time.sleep(RETRY_DELAY)
+                time.sleep(delay)
 
     raise FeedbackServiceError(
-        "Both Gemini and Ollama failed to generate feedback after all retries. "
-        "Check your API key, internet connection, and that Ollama is running."
+        "Both Azure OpenAI and Gemini failed to generate feedback after all retries. "
+        "Check your API keys and internet connection."
     )

@@ -2,7 +2,7 @@ fastapi
 uvicorn[standard]
 python-multipart
 openai-whisper
-ollama
+openai
 google-genai
 python-dotenv
 certifi
