@@ -1,3 +1,4 @@
+import { Circle, Loader2, CheckCircle2, XCircle, type LucideIcon } from "lucide-react";
 import type { SSEEvent } from "../types/api";
 
 // The fixed ordered steps shown in the UI
@@ -22,19 +23,22 @@ function deriveStepStates(
   return map;
 }
 
-function stepIcon(status: string | undefined): string {
-  if (!status) return "○";
+// Map a step status to a lucide icon + color (spin flag for active states)
+function stepIcon(status: string | undefined): {
+  Icon: LucideIcon;
+  className: string;
+  spin?: boolean;
+} {
   switch (status) {
     case "done":
-      return "✅";
+      return { Icon: CheckCircle2, className: "text-emerald-400" };
     case "error":
-      return "❌";
+      return { Icon: XCircle, className: "text-rose-400" };
     case "in_progress":
-      return "⏳";
     case "retrying":
-      return "🔄";
+      return { Icon: Loader2, className: "text-indigo-400", spin: true };
     default:
-      return "○";
+      return { Icon: Circle, className: "text-slate-600" };
   }
 }
 
@@ -61,16 +65,20 @@ export default function ProgressTracker({
           !isDone &&
           i === STEPS.findIndex((s) => !states.has(s.key));
 
+        const { Icon, className, spin } = isError
+          ? stepIcon("error")
+          : stepIcon(state?.status);
+
         return (
           <div
             key={step.key}
             className={`flex items-start gap-3 px-4 py-3 rounded-lg
-              ${isDone ? "bg-emerald-950/30" : isActive ? "bg-indigo-950/30" : "bg-transparent"}
+              ${isDone ? "bg-emerald-500/[0.08]" : isActive ? "bg-indigo-500/[0.08]" : "bg-transparent"}
             `}
           >
-            <span className="text-base w-5 text-center shrink-0 mt-0.5">
-              {isError ? "❌" : stepIcon(state?.status)}
-            </span>
+            <Icon
+              className={`h-[18px] w-[18px] shrink-0 mt-0.5 ${className} ${spin ? "animate-spin" : ""}`}
+            />
             <div className="flex-1 min-w-0">
               <p
                 className={`text-sm font-medium ${isDone ? "text-emerald-300" : isActive ? "text-indigo-300" : "text-slate-400"}`}
@@ -90,7 +98,7 @@ export default function ProgressTracker({
 
       {/* Pipeline error message */}
       {pipelineError && (
-        <div className="mt-3 rounded-lg border border-rose-800 bg-rose-950/40 px-4 py-3">
+        <div className="mt-3 rounded-lg ring-1 ring-rose-500/30 bg-rose-500/10 px-4 py-3">
           <p className="text-sm font-medium text-rose-300">Pipeline Error</p>
           <p className="text-xs text-rose-400 mt-1">{pipelineError}</p>
         </div>

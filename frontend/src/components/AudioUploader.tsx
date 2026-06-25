@@ -1,4 +1,14 @@
 import { useRef, useState } from "react";
+import {
+  Upload,
+  Mic,
+  AudioLines,
+  CheckCircle2,
+  RotateCcw,
+  Square,
+  Circle,
+  AlertTriangle,
+} from "lucide-react";
 import { useAudioRecorder } from "../hooks/useAudioRecorder";
 
 interface AudioUploaderProps {
@@ -112,30 +122,32 @@ export default function AudioUploader({
         </label>
         
         {/* Tabs */}
-        <div className="flex bg-slate-800/50 p-1 rounded-lg">
+        <div className="flex bg-surface-2 p-1 rounded-lg">
           <button
             type="button"
             onClick={() => switchTab('upload')}
             disabled={disabled}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'upload' 
-                ? 'bg-slate-700 text-white shadow-sm' 
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              activeTab === 'upload'
+                ? 'bg-white/[0.08] text-white'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            📁 Upload
+            <Upload className="h-3.5 w-3.5" />
+            Upload
           </button>
           <button
             type="button"
             onClick={() => switchTab('record')}
             disabled={disabled}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-              activeTab === 'record' 
-                ? 'bg-slate-700 text-white shadow-sm' 
+            className={`flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+              activeTab === 'record'
+                ? 'bg-white/[0.08] text-white'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            🎙️ Record
+            <Mic className="h-3.5 w-3.5" />
+            Record
           </button>
         </div>
       </div>
@@ -159,14 +171,14 @@ export default function AudioUploader({
             relative flex flex-col items-center justify-center gap-3
             rounded-lg border-2 border-dashed px-6 py-8 cursor-pointer
             transition-colors duration-150
-            ${dragOver ? "border-indigo-400 bg-indigo-950/30" : "border-slate-700 bg-slate-800/50 hover:border-slate-500"}
+            ${dragOver ? "border-indigo-400 bg-indigo-500/10" : "border-white/10 bg-surface-2 hover:border-white/20"}
             ${disabled ? "opacity-50 cursor-not-allowed" : ""}
           `}
         >
           {file ? (
             <div className="flex items-center gap-4 w-full">
               <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo-500/20 shrink-0">
-                <span className="text-xl">🎵</span>
+                <AudioLines className="h-5 w-5 text-indigo-400" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-100 truncate">
@@ -187,7 +199,7 @@ export default function AudioUploader({
             </div>
           ) : (
             <>
-              <span className="text-3xl">🎤</span>
+              <AudioLines className="h-8 w-8 text-slate-500" />
               <div className="text-center">
                 <p className="text-sm text-slate-300">
                   Drop your audio here or{" "}
@@ -203,14 +215,14 @@ export default function AudioUploader({
       ) : (
         <div className={`
           relative flex flex-col items-center justify-center gap-4
-          rounded-lg border-2 border-slate-700 bg-slate-800/50 px-6 py-8
+          rounded-lg border-2 border-white/10 bg-surface-2 px-6 py-8
           ${disabled ? "opacity-50" : ""}
         `}>
           {file ? (
             // State 4: Recording is approved and selected as a File
             <div className="flex flex-col items-center gap-3 w-full">
                <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium">
-                 <span>✅</span> Recording ready
+                 <CheckCircle2 className="h-4 w-4" /> Recording ready
                </div>
                {audioUrl && (
                  <audio src={audioUrl} controls className="w-full max-w-sm h-10" />
@@ -239,17 +251,17 @@ export default function AudioUploader({
                   type="button"
                   onClick={resetRecording}
                   disabled={disabled}
-                  className="px-4 py-2 text-sm font-medium text-slate-300 bg-slate-700 hover:bg-slate-600 rounded-md transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-300 bg-surface ring-1 ring-white/[0.08] hover:bg-white/[0.06] rounded-md transition-colors"
                 >
-                  🔄 Re-record
+                  <RotateCcw className="h-4 w-4" /> Re-record
                 </button>
                 <button
                   type="button"
                   onClick={handleUseRecording}
                   disabled={disabled}
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors"
                 >
-                  ✅ Use this
+                  <CheckCircle2 className="h-4 w-4" /> Use this
                 </button>
               </div>
             </div>
@@ -276,15 +288,15 @@ export default function AudioUploader({
                     stopRecording();
                   }
                 }}
-                className="px-6 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-500 rounded-md transition-colors"
+                className="flex items-center gap-1.5 px-6 py-2 text-sm font-medium text-white bg-rose-600 hover:bg-rose-500 rounded-md transition-colors"
               >
-                ⏹️ Stop Recording
+                <Square className="h-4 w-4 fill-current" /> Stop Recording
               </button>
             </div>
           ) : (
             // State 1: Idle
             <div className="flex flex-col items-center gap-3">
-              <span className="text-3xl">🎙️</span>
+              <Mic className="h-8 w-8 text-slate-500" />
               <p className="text-sm text-slate-300 font-medium">Ready to record</p>
               {permissionDenied && (
                 <p className="text-xs text-rose-400 text-center max-w-xs mt-1">
@@ -295,9 +307,9 @@ export default function AudioUploader({
                 type="button"
                 onClick={startRecording}
                 disabled={disabled || permissionDenied}
-                className="mt-2 px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mt-2 flex items-center gap-1.5 px-6 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-500 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                🔴 Start Recording
+                <Circle className="h-4 w-4 fill-rose-500 text-rose-500" /> Start Recording
               </button>
             </div>
           )}
@@ -306,8 +318,9 @@ export default function AudioUploader({
 
       {/* Validation / Error messages */}
       {combinedError && (
-        <p id="audio-error" role="alert" className="text-xs text-rose-400">
-          ⚠ {combinedError}
+        <p id="audio-error" role="alert" className="flex items-center gap-1.5 text-xs text-rose-400">
+          <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+          {combinedError}
         </p>
       )}
 

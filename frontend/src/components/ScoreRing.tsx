@@ -32,7 +32,7 @@ export default function ScoreRing({ score, size = 120 }: ScoreRingProps) {
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="#1e293b"
+          stroke="#1a1f29"
           strokeWidth={strokeWidth}
         />
         {/* score arc */}

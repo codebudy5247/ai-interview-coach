@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { Target, History, Sparkles, AlertTriangle } from 'lucide-react'
 import QuestionInput from '../components/QuestionInput'
 import AudioUploader from '../components/AudioUploader'
 import CodeSnippetInput from '../components/CodeSnippetInput'
@@ -25,9 +26,9 @@ export default function UploadPage() {
 
     try {
       const { session_id } = await analyzeAnswer(
-        question.trim(), 
-        audioFile!, 
-        codeSnippet, 
+        question.trim(),
+        audioFile!,
+        codeSnippet,
         codeLanguage
       )
       navigate(`/progress/${session_id}`)
@@ -47,17 +48,19 @@ export default function UploadPage() {
 
         {/* Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-slate-100 tracking-tight">
-            🎯 Interview Coach
+          <h1 className="flex items-center justify-center gap-2.5 text-3xl font-bold text-slate-100 tracking-tight">
+            <Target className="h-7 w-7 text-indigo-400" strokeWidth={2.25} />
+            Interview Coach
           </h1>
           <p className="mt-2 text-slate-400 text-sm">
             Practice. Get AI Feedback. Improve.
           </p>
           <Link
             to="/history"
-            className="mt-3 inline-block text-sm text-indigo-400 hover:text-indigo-300"
+            className="mt-4 inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
           >
-            📚 View History
+            <History className="h-4 w-4" />
+            View History
           </Link>
         </div>
 
@@ -65,7 +68,7 @@ export default function UploadPage() {
         <form
           id="upload-form"
           onSubmit={handleSubmit}
-          className="rounded-xl border border-slate-800 bg-slate-900 p-6 flex flex-col gap-6"
+          className="rounded-xl bg-surface ring-1 ring-white/[0.06] p-6 flex flex-col gap-6"
         >
           <QuestionInput
             value={question}
@@ -92,9 +95,10 @@ export default function UploadPage() {
             <div
               id="submit-error"
               role="alert"
-              className="rounded-lg border border-rose-800 bg-rose-950/40 px-4 py-3 text-sm text-rose-300"
+              className="flex items-start gap-2 rounded-lg ring-1 ring-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300"
             >
-              ⚠ {submitError}
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{submitError}</span>
             </div>
           )}
 
@@ -102,9 +106,10 @@ export default function UploadPage() {
             id="btn-submit"
             type="submit"
             disabled={!canSubmit}
-            className="w-full rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {loading ? 'Uploading…' : '🚀 Analyze My Answer'}
+            <Sparkles className="h-4 w-4" />
+            {loading ? 'Uploading…' : 'Analyze My Answer'}
           </button>
 
           {/* Validation hint */}

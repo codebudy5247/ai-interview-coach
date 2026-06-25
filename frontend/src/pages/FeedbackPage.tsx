@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
+import { FileText, History, ArrowLeft } from 'lucide-react'
 import FeedbackReport from '../components/FeedbackReport'
 import { getFeedback, getSessionDetail, downloadReport } from '../services/api'
 import type { FeedbackResponse } from '../types/api'
@@ -76,16 +77,17 @@ export default function FeedbackPage() {
   if (error || !feedback) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-xl border border-rose-800 bg-rose-950/30 p-6 text-center">
+        <div className="w-full max-w-md rounded-xl ring-1 ring-rose-500/30 bg-rose-500/10 p-6 text-center">
           <p className="text-rose-300 font-medium mb-1">Failed to load feedback</p>
           <p className="text-rose-400 text-sm mb-4">{error}</p>
           <button
             id="btn-go-home"
             type="button"
             onClick={() => navigate('/')}
-            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-500 transition-colors"
           >
-            ← Start Over
+            <ArrowLeft className="h-4 w-4" />
+            Start Over
           </button>
         </div>
       </div>
@@ -99,16 +101,20 @@ export default function FeedbackPage() {
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-100">📋 Feedback Report</h1>
+            <h1 className="flex items-center gap-2 text-2xl font-bold text-slate-100">
+              <FileText className="h-6 w-6 text-indigo-400" />
+              Feedback Report
+            </h1>
             <p className="text-slate-500 text-sm mt-1">
               Session: {sessionId?.slice(0, 8)}
             </p>
           </div>
           <Link
             to="/history"
-            className="text-sm text-indigo-400 hover:text-indigo-300"
+            className="inline-flex items-center gap-1.5 text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
           >
-            📚 View History
+            <History className="h-4 w-4" />
+            View History
           </Link>
         </div>
 

@@ -1,11 +1,18 @@
 @import "tailwindcss";
 
+/* ── Design tokens ── */
+@theme {
+  --color-bg: #0b0d12;          /* page background */
+  --color-surface: #14171f;     /* cards */
+  --color-surface-2: #1a1f29;   /* insets, hover, code blocks */
+}
+
 /* ── Global ── */
 *, *::before, *::after { box-sizing: border-box; }
 
 body {
   font-family: 'Inter', sans-serif;
-  background-color: #0f1117;
+  background-color: var(--color-bg);
   color: #e2e8f0;
   margin: 0;
   min-height: 100vh;
@@ -14,5 +21,6 @@ body {
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0f1117; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
+::-webkit-scrollbar-thumb { background: #2a2f3a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3a414f; }

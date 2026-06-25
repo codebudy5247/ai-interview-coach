@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { Code2, X } from 'lucide-react'
 
 interface CodeSnippetInputProps {
   code: string
@@ -77,10 +78,10 @@ export default function CodeSnippetInput({
           disabled={disabled}
           className="self-start text-sm font-medium text-slate-400 hover:text-indigo-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
         >
-          <span>🔗</span> Attach Code Snippet (Optional)
+          <Code2 className="h-4 w-4" /> Attach Code Snippet (Optional)
         </button>
       ) : (
-        <div className="flex flex-col gap-3 rounded-lg border border-slate-700 bg-slate-900/50 p-4 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="flex flex-col gap-3 rounded-lg ring-1 ring-white/[0.06] bg-surface p-4 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <label htmlFor="code-language" className="text-sm font-medium text-slate-300">
@@ -91,7 +92,7 @@ export default function CodeSnippetInput({
                 value={language}
                 onChange={(e) => onLanguageChange(e.target.value)}
                 disabled={disabled}
-                className="rounded-md border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:border-indigo-500 focus:outline-none disabled:opacity-50"
+                className="rounded-md bg-surface-2 ring-1 ring-white/[0.06] px-2 py-1 text-xs text-slate-300 focus:ring-indigo-500 focus:outline-none disabled:opacity-50"
               >
                 {LANGUAGES.map((lang) => (
                   <option key={lang.value} value={lang.value}>
@@ -106,7 +107,7 @@ export default function CodeSnippetInput({
               disabled={disabled}
               className="text-xs font-medium text-slate-500 hover:text-rose-400 disabled:opacity-50 transition-colors flex items-center gap-1"
             >
-              <span>✕</span> Remove
+              <X className="h-3.5 w-3.5" /> Remove
             </button>
           </div>
 
@@ -121,10 +122,10 @@ export default function CodeSnippetInput({
               maxLength={MAX_CHARS}
               rows={8}
               placeholder="Paste your code here..."
-              className="w-full rounded-md border border-slate-700 bg-slate-800 p-3 font-mono text-sm text-slate-200 placeholder-slate-500 resize-y focus:border-indigo-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-md bg-surface-2 ring-1 ring-white/[0.06] p-3 font-mono text-sm text-slate-200 placeholder-slate-500 resize-y focus:ring-indigo-500 focus:outline-none transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
               spellCheck={false}
             />
-            <div className="absolute bottom-2 right-2 px-1 bg-slate-800 rounded">
+            <div className="absolute bottom-2 right-2 px-1 bg-surface-2 rounded">
               <span className={`text-xs ${isNearLimit ? 'text-amber-400' : 'text-slate-500'}`}>
                 {code.length} / {MAX_CHARS}
               </span>
