@@ -85,3 +85,10 @@ API keys are stored in `backend/.env`:
 - `IMAGEKIT_PUBLIC_KEY`: ImageKit public key (get from https://imagekit.io/dashboard/developer)
 - `IMAGEKIT_PRIVATE_KEY`: ImageKit private key
 - `IMAGEKIT_URL_ENDPOINT`: ImageKit URL endpoint
+
+All configuration is centralized in `backend/config.py`, which reads env once.
+Optional overrides (with defaults): `LOG_LEVEL` (INFO), `CORS_ORIGINS`
+(comma-separated; defaults to the localhost:5173 dev origins), `GEMINI_MODEL`,
+`WHISPER_MODEL` (base), `RETRY_DELAY`, `SSE_POLL_INTERVAL`/`SSE_DRAIN_DELAY`,
+`MAX_UPLOAD_BYTES`/`MAX_QUESTION_LEN`/`MAX_CODE_LEN`, and
+`SESSION_STORE_MAX`/`SESSION_TTL_SECONDS` (in-memory session store eviction).

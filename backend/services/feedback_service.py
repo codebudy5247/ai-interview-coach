@@ -19,47 +19,53 @@ Environment variables (loaded from backend/.env):
 """
 
 import json
-import os
+import logging
 import re
 import time
 
 from openai import AzureOpenAI
 from google import genai
-from dotenv import load_dotenv
 
+from config import (
+    AZURE_OPENAI_API_KEY,
+    AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_DEPLOYMENT,
+    AZURE_OPENAI_API_VERSION,
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
+    MAX_RETRIES,
+    RETRY_DELAY,
+)
 from services.prompts import build_prompt
 
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
-# Config
+# Lazy client singletons — created once on first use, reused across requests.
+# Built lazily so a missing key doesn't crash at import time.
 # ---------------------------------------------------------------------------
-load_dotenv()
-
-AZURE_OPENAI_API_KEY: str = os.getenv("AZURE_OPENAI_API_KEY", "").strip()
-AZURE_OPENAI_DEPLOYMENT: str = os.getenv("AZURE_OPENAI_DEPLOYMENT", "").strip()
-AZURE_OPENAI_API_VERSION: str = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21").strip()
+_azure_client: AzureOpenAI | None = None
+_gemini_client: "genai.Client | None" = None
 
 
-def _resolve_azure_endpoint() -> str:
-    """
-    Accept either AZURE_OPENAI_ENDPOINT (full URL) or AZURE_OPENAI_RESOURCE_NAME
-    (just the resource, from which the standard endpoint URL is built).
-    """
-    endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
-    if endpoint:
-        return endpoint
-    resource = os.getenv("AZURE_OPENAI_RESOURCE_NAME", "").strip()
-    if resource:
-        return f"https://{resource}.openai.azure.com"
-    return ""
+def _get_azure_client() -> AzureOpenAI:
+    global _azure_client
+    if _azure_client is None:
+        logger.info("Creating Azure OpenAI client (once).")
+        _azure_client = AzureOpenAI(
+            api_key=AZURE_OPENAI_API_KEY,
+            azure_endpoint=AZURE_OPENAI_ENDPOINT,
+            api_version=AZURE_OPENAI_API_VERSION,
+        )
+    return _azure_client
 
 
-AZURE_OPENAI_ENDPOINT: str = _resolve_azure_endpoint()
-
-GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
-MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", "2"))
-RETRY_DELAY: float = float(os.getenv("RETRY_DELAY", "2"))
-
-GEMINI_MODEL = "gemini-3-flash-preview"  # gemini-3.1-flash-lite
+def _get_gemini_client() -> "genai.Client":
+    global _gemini_client
+    if _gemini_client is None:
+        logger.info("Creating Gemini client (once).")
+        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    return _gemini_client
 
 
 # ---------------------------------------------------------------------------
@@ -101,13 +107,13 @@ def _call_gemini(prompt: str) -> dict:
     Send the prompt to Gemini and return the parsed feedback dict.
     Raises any exception on failure (caller handles retries).
     """
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    client = _get_gemini_client()
     response = client.models.generate_content(
         model=GEMINI_MODEL,
         contents=prompt,
     )
     raw = response.text
-    print(f"[feedback_service] Gemini raw response (first 200 chars): {raw[:200]}")
+    logger.debug("Gemini raw response (first 200 chars): %s", raw[:200])
     return _parse_json(raw)
 
 
@@ -117,14 +123,11 @@ def _gemini_retry_delay(exc: Exception) -> float:
     error response and return it. Otherwise return the configured RETRY_DELAY.
     This prevents hammering the API with retries it told us to wait on.
     """
-    msg = str(exc)
     # API returns 'Please retry in X.XXXs'
-    import re as _re
-
-    match = _re.search(r"retry in (\d+(?:\.\d+)?)s", msg)
+    match = re.search(r"retry in (\d+(?:\.\d+)?)s", str(exc))
     if match:
         suggested = float(match.group(1))
-        print(f"[feedback_service] Rate-limited. API says retry in {suggested}s.")
+        logger.info("Rate-limited. API says retry in %ss.", suggested)
         return suggested
     return RETRY_DELAY
 
@@ -143,18 +146,14 @@ def _call_azure(prompt: str) -> dict:
     Send the prompt to Azure OpenAI (chat completions, JSON mode) and return
     the parsed feedback dict. Raises any exception on failure (caller handles retries).
     """
-    client = AzureOpenAI(
-        api_key=AZURE_OPENAI_API_KEY,
-        azure_endpoint=AZURE_OPENAI_ENDPOINT,
-        api_version=AZURE_OPENAI_API_VERSION,
-    )
+    client = _get_azure_client()
     response = client.chat.completions.create(
         model=AZURE_OPENAI_DEPLOYMENT,
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
     )
     raw = response.choices[0].message.content
-    print(f"[feedback_service] Azure raw response (first 200 chars): {raw[:200]}")
+    logger.debug("Azure raw response (first 200 chars): %s", raw[:200])
     return _parse_json(raw)
 
 
@@ -215,7 +214,7 @@ def get_feedback(
     if AZURE_OPENAI_API_KEY:
         for attempt in range(1, MAX_RETRIES + 1):
             try:
-                print(f"[feedback_service] Azure attempt {attempt}/{MAX_RETRIES}...")
+                logger.info("Azure attempt %s/%s...", attempt, MAX_RETRIES)
                 if on_status:
                     on_status(
                         "azure",
@@ -224,14 +223,14 @@ def get_feedback(
                         f"Analyzing with Azure OpenAI (attempt {attempt})...",
                     )
                 result = _call_azure(prompt)
-                print("[feedback_service] Azure succeeded.")
+                logger.info("Azure succeeded.")
                 if on_status:
                     on_status(
                         "azure", attempt, "done", "Feedback generated via Azure OpenAI"
                     )
                 return result
             except Exception as exc:
-                print(f"[feedback_service] Azure attempt {attempt} failed: {exc}")
+                logger.warning("Azure attempt %s failed: %s", attempt, exc)
                 if attempt < MAX_RETRIES:
                     delay = _azure_retry_delay(exc)
                     if on_status:
@@ -242,9 +241,7 @@ def get_feedback(
                             f"Azure failed. Retrying in {delay}s...",
                         )
                     time.sleep(delay)
-        print(
-            "[feedback_service] Azure exhausted all retries. Falling back to Gemini..."
-        )
+        logger.info("Azure exhausted all retries. Falling back to Gemini...")
         if on_status:
             on_status(
                 "azure",
@@ -253,9 +250,7 @@ def get_feedback(
                 "Azure exhausted retries. Falling back to Gemini...",
             )
     else:
-        print(
-            "[feedback_service] AZURE_OPENAI_API_KEY not set — skipping Azure, using Gemini directly."
-        )
+        logger.info("AZURE_OPENAI_API_KEY not set — skipping Azure, using Gemini directly.")
         if on_status:
             on_status(
                 "gemini",
@@ -273,7 +268,7 @@ def get_feedback(
 
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            print(f"[feedback_service] Gemini attempt {attempt}/{MAX_RETRIES}...")
+            logger.info("Gemini attempt %s/%s...", attempt, MAX_RETRIES)
             if on_status:
                 on_status(
                     "gemini",
@@ -282,14 +277,14 @@ def get_feedback(
                     f"Analyzing with Gemini (attempt {attempt})...",
                 )
             result = _call_gemini(prompt)
-            print("[feedback_service] Gemini succeeded.")
+            logger.info("Gemini succeeded.")
             if on_status:
                 on_status("gemini", attempt, "done", "Feedback generated via Gemini")
             return result
         except Exception as exc:
-            print(f"[feedback_service] Gemini attempt {attempt} failed: {exc}")
+            logger.warning("Gemini attempt %s failed: %s", attempt, exc)
             if _is_quota_exhausted(exc):
-                print("[feedback_service] Daily quota exhausted — no providers left.")
+                logger.info("Daily quota exhausted — no providers left.")
                 if on_status:
                     on_status(
                         "gemini",

@@ -9,8 +9,8 @@ class InterviewSession(Base):
     id = Column(String, primary_key=True)  # UUID session_id
     question = Column(Text, nullable=False)
     transcript = Column(Text, nullable=False)
-    overall_score = Column(Integer, nullable=False)
+    overall_score = Column(Integer, nullable=False, index=True)  # sorted in /api/sessions
     feedback_json = Column(Text, nullable=False)  # Full feedback as JSON string
     code_snippet = Column(Text, nullable=True)
     code_language = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)  # sorted in /api/sessions
