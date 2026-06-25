@@ -1,5 +1,41 @@
 [
   {
+    "id": "tc_code_01_correct_debounce",
+    "category": "Code Review - Correct Reading",
+    "question": "Walk me through what this function does and any improvement you would make.",
+    "code_language": "javascript",
+    "code_snippet": "function debounce(fn, delay) {\n  let timer;\n  return function (...args) {\n    clearTimeout(timer);\n    timer = setTimeout(() => fn.apply(this, args), delay);\n  };\n}",
+    "transcript": "This is a debounce. It returns a wrapped function, and every time that wrapper is called it clears the previously scheduled timer with clearTimeout and schedules a new one. So the original fn only actually runs once calls stop coming in for `delay` milliseconds. It uses apply to forward the arguments and preserve the this binding. One improvement would be to add a leading-edge option so it can optionally fire immediately on the first call, and maybe return a cancel method to clear a pending timer.",
+    "expected_behavior": "Should score high (8-10). Feedback should confirm the candidate correctly read the timer reset behaviour, the apply/this handling, and credit the leading-edge / cancel improvement. ideal_code may show a debounce with a cancel or leading option."
+  },
+  {
+    "id": "tc_code_02_missed_bug",
+    "category": "Code Review - Missed Bug",
+    "question": "This function is supposed to return the list with duplicates removed. Review it for correctness.",
+    "code_language": "python",
+    "code_snippet": "def dedupe(items):\n    result = items\n    seen = set()\n    for x in items:\n        if x in seen:\n            result.remove(x)\n        seen.add(x)\n    return result",
+    "transcript": "Yeah this looks fine to me. It keeps a set of items it has already seen, and if it sees a duplicate it removes it from the result, otherwise it adds it to the seen set. So at the end you get a list with the duplicates taken out. I think it's correct and reasonably efficient.",
+    "expected_behavior": "Should dock correctness heavily. Feedback MUST flag that the function mutates the same list it is iterating over (result is just an alias of items), which skips elements and produces wrong output, and that list.remove is O(n) and removes the wrong occurrence. ideal_code should return a clean dedupe that preserves order without mutating during iteration."
+  },
+  {
+    "id": "tc_code_03_confident_wrong",
+    "category": "Code Review - Confident Wrong",
+    "question": "What does this function return and what is its time complexity?",
+    "code_language": "javascript",
+    "code_snippet": "function mystery(arr) {\n  return arr.reduce((a, b) => a + b, 0) / arr.length;\n}",
+    "transcript": "So this function first sorts the array internally as part of the reduce, then it finds the middle element, so it returns the median of the array. Because of the sorting step the time complexity is O(n log n).",
+    "expected_behavior": "Should score very low on correctness (1-2). Feedback MUST state the candidate is wrong: reduce sums the elements and divides by length, so it returns the arithmetic mean (average), not the median, there is no sorting, and the complexity is O(n), not O(n log n)."
+  },
+  {
+    "id": "tc_code_04_optimize_correct",
+    "category": "Code Review - Optimization",
+    "question": "Can you improve the time complexity of this function?",
+    "code_language": "python",
+    "code_snippet": "def has_pair_with_sum(nums, target):\n    for i in range(len(nums)):\n        for j in range(i + 1, len(nums)):\n            if nums[i] + nums[j] == target:\n                return True\n    return False",
+    "transcript": "Right now this is two nested loops, so it's O(n squared). I can make it O(n) by using a hash set. I iterate once, and for each number I check whether target minus that number is already in the set. If it is, I return true. Otherwise I add the current number to the set and keep going. That trades a bit of memory, O(n) space, for the faster lookup.",
+    "expected_behavior": "Should score high (8-10). Feedback should confirm the O(n^2) to O(n) optimization with a hash set is correct and note the space tradeoff. ideal_code should contain the single-pass set solution."
+  },
+  {
     "id": "tc_01_perfect_react",
     "category": "Perfect Answer",
     "question": "Can you explain the difference between useMemo and useCallback in React?",

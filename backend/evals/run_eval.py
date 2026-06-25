@@ -8,16 +8,21 @@ from pydantic import BaseModel
 # Add backend directory to sys.path so we can import services
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from google import genai
-from google.genai import types
+from openai import AzureOpenAI
 from dotenv import load_dotenv
 
 from services.feedback_service import get_feedback
 
-# Load environment variables (GEMINI_API_KEY)
+# Load environment variables (Azure OpenAI)
 load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = "gemini-3-flash-preview"
+AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY", "").strip()
+AZURE_OPENAI_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT", "").strip()
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21").strip()
+# Accept full endpoint URL or derive it from the resource name
+AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
+if not AZURE_OPENAI_ENDPOINT:
+    _res = os.getenv("AZURE_OPENAI_RESOURCE_NAME", "").strip()
+    AZURE_OPENAI_ENDPOINT = f"https://{_res}.openai.azure.com" if _res else ""
 
 class EvalScore(BaseModel):
     accuracy: int
@@ -26,8 +31,9 @@ class EvalScore(BaseModel):
     rationale: str
 
 def run_evaluation():
-    if not GEMINI_API_KEY:
-        print("Error: GEMINI_API_KEY is not set in backend/.env")
+    if not (AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_DEPLOYMENT):
+        print("Error: Azure OpenAI is not configured in backend/.env "
+              "(need AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT)")
         sys.exit(1)
 
     evals_dir = Path(__file__).parent
@@ -39,35 +45,54 @@ def run_evaluation():
         print(f"Error: Dataset not found at {dataset_path}")
         sys.exit(1)
 
+    # EVAL_LIMIT caps the number of cases per run (default 5) to avoid rate limits.
+    # Set EVAL_LIMIT=0 to run the entire dataset.
+    limit = int(os.getenv("EVAL_LIMIT", "5"))
     with open(dataset_path, "r", encoding="utf-8") as f:
-        dataset = json.load(f)[:5]  # Limit to 5 test cases to avoid rate limits
+        dataset = json.load(f)
+    if limit > 0:
+        dataset = dataset[:limit]
 
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    client = AzureOpenAI(
+        api_key=AZURE_OPENAI_API_KEY,
+        azure_endpoint=AZURE_OPENAI_ENDPOINT,
+        api_version=AZURE_OPENAI_API_VERSION,
+    )
     results = []
-    
-    print(f"Starting evaluation of {len(dataset)} test cases using {GEMINI_MODEL}...")
+
+    print(f"Starting evaluation of {len(dataset)} test cases using Azure deployment '{AZURE_OPENAI_DEPLOYMENT}'...")
     print("-" * 50)
     
     for i, tc in enumerate(dataset):
         tc_id = tc["id"]
         print(f"[{i+1}/{len(dataset)}] Evaluating {tc_id} ({tc['category']})...")
         
-        # 1. Generate feedback using our app's pipeline
+        # 1. Generate feedback using our app's pipeline (incl. code snippet if present)
+        code_snippet = tc.get("code_snippet")
+        code_language = tc.get("code_language")
         try:
             # We don't pass on_status callback to keep the console clean
-            feedback = get_feedback(tc["question"], tc["transcript"])
+            feedback = get_feedback(
+                tc["question"],
+                tc["transcript"],
+                code_snippet=code_snippet,
+                code_language=code_language,
+            )
         except Exception as e:
             print(f"  ❌ Error generating feedback: {e}")
             continue
-            
+
         # 2. Judge the feedback
+        code_block = ""
+        if code_snippet:
+            code_block = f"\n# Code Snippet Under Discussion ({code_language or 'unknown'})\n{code_snippet}\n"
         judge_prompt = f"""
 You are an expert prompt engineer and quality assurance judge.
 Your task is to evaluate the quality of an AI-generated interview feedback report.
 
 # Original Interview Question
 {tc["question"]}
-
+{code_block}
 # Candidate's Transcript
 {tc["transcript"]}
 
@@ -83,21 +108,21 @@ Score the Generated Feedback on a scale of 1 to 5 for each metric (5 is best):
 - actionability (1-5): Are the 'improvements' concrete and useful?
 - hallucination (1-5): Did the feedback invent details not present in the transcript? (5 = no hallucination at all, 1 = severe hallucination/completely made up)
 
-Return the result as a JSON object matching the requested schema.
+Return the result as a JSON object with exactly these keys:
+  "accuracy" (int 1-5), "actionability" (int 1-5), "hallucination" (int 1-5), "rationale" (string).
 """
-        
+
         try:
-            response = client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=judge_prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=EvalScore,
-                )
+            response = client.chat.completions.create(
+                model=AZURE_OPENAI_DEPLOYMENT,
+                messages=[{"role": "user", "content": judge_prompt}],
+                response_format={"type": "json_object"},
             )
-            
-            # The API returns the JSON string in response.text
-            score_data = json.loads(response.text)
+
+            # Validate against the schema, then use as a plain dict
+            score_data = EvalScore.model_validate_json(
+                response.choices[0].message.content
+            ).model_dump()
             
             results.append({
                 "id": tc_id,
@@ -127,7 +152,7 @@ Return the result as a JSON object matching the requested schema.
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("# LLM Evaluation Report\n\n")
         f.write(f"**Date:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(f"**Model:** {GEMINI_MODEL}\n")
+        f.write(f"**Judge Model:** Azure OpenAI / {AZURE_OPENAI_DEPLOYMENT}\n")
         f.write(f"**Total Test Cases:** {len(results)} / {len(dataset)}\n\n")
         f.write("## Average Scores (out of 5)\n")
         f.write(f"- **Accuracy:** {avg_acc:.2f}\n")

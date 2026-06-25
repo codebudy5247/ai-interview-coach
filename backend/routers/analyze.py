@@ -66,7 +66,7 @@ def _run_pipeline(session_id: str) -> None:
 
     Steps:
       1. Transcribe audio with Whisper
-      2. Generate feedback via Gemini → Ollama fallback (with retries)
+      2. Generate feedback via Azure OpenAI → Gemini fallback (with retries)
       3. Store results in _sessions[session_id]
       4. Clean up temp audio file
     """
@@ -222,7 +222,7 @@ async def analyze(
     # Emit initial event
     _emit_sse(session_id, "uploaded", "done", "Audio uploaded")
 
-    # Run pipeline in a background thread (Whisper + Gemini/Ollama are blocking/CPU-bound)
+    # Run pipeline in a background thread (Whisper + Azure/Gemini are blocking/CPU-bound)
     thread = threading.Thread(
         target=_run_pipeline,
         args=(session_id,),
