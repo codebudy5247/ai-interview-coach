@@ -1,8 +1,9 @@
-import os
-import uuid
+import logging
 import shutil
 from pathlib import Path
 from fastapi import UploadFile, HTTPException
+
+logger = logging.getLogger(__name__)
 
 TEMP_DIR = Path(__file__).parent.parent / "temp"
 
@@ -57,7 +58,7 @@ def delete_temp(session_id: str) -> None:
     for path in TEMP_DIR.glob(f"{session_id}.*"):
         try:
             path.unlink(missing_ok=True)
-        except Exception:
-            pass  # Best-effort cleanup
+        except OSError as exc:
+            logger.warning("Could not delete temp file %s: %s", path, exc)
 
 

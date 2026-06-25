@@ -31,6 +31,12 @@ class SSEEvent(BaseModel):
     message: str
 
 
+class StatusResponse(BaseModel):
+    session_id: str
+    status: str
+    error: Optional[str] = None
+
+
 class CleanupResponse(BaseModel):
     success: bool
 
