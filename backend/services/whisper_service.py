@@ -9,11 +9,16 @@ Model choice guide for M1 8GB:
   "small" → more accurate (~2 min), slower
 """
 
+import logging
 import os
 import ssl
 import certifi
 import imageio_ffmpeg
 import whisper
+
+import config
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # macOS SSL fix
@@ -39,15 +44,15 @@ def _ensure_ffmpeg_symlink() -> None:
     link = os.path.join(os.path.dirname(sys.executable), "ffmpeg")
     if not os.path.exists(link):
         os.symlink(exe, link)
-        print(f"[whisper_service] Created ffmpeg symlink: {link}")
+        logger.info("Created ffmpeg symlink: %s", link)
     else:
-        print(f"[whisper_service] ffmpeg already available at: {link}")
+        logger.info("ffmpeg already available at: %s", link)
 
 _ensure_ffmpeg_symlink()
 
 # Load the model once at module level so it isn't reloaded on every request.
-# Change "base" to "tiny" or "small" as needed.
-_WHISPER_MODEL_NAME = "base"
+# Model name is configurable via WHISPER_MODEL (tiny | base | small | ...).
+_WHISPER_MODEL_NAME = config.WHISPER_MODEL
 _model: whisper.Whisper | None = None
 
 
@@ -55,9 +60,9 @@ def _get_model() -> whisper.Whisper:
     """Lazy-load and cache the Whisper model."""
     global _model
     if _model is None:
-        print(f"[whisper_service] Loading Whisper model: {_WHISPER_MODEL_NAME}")
+        logger.info("Loading Whisper model: %s", _WHISPER_MODEL_NAME)
         _model = whisper.load_model(_WHISPER_MODEL_NAME)
-        print("[whisper_service] Whisper model loaded.")
+        logger.info("Whisper model loaded.")
     return _model
 
 
@@ -76,10 +81,10 @@ def transcribe(audio_path: str) -> str:
     """
     try:
         model = _get_model()
-        print(f"[whisper_service] Transcribing: {audio_path}")
+        logger.info("Transcribing: %s", audio_path)
         result = model.transcribe(audio_path, fp16=False)  # fp16=False for CPU/M1 safety
         transcript = result.get("text", "").strip()
-        print(f"[whisper_service] Done. Transcript length: {len(transcript)} chars")
+        logger.info("Done. Transcript length: %s chars", len(transcript))
         return transcript
     except Exception as exc:
         raise RuntimeError(f"Whisper transcription failed: {exc}") from exc
