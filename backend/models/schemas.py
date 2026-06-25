@@ -18,6 +18,7 @@ class FeedbackResponse(BaseModel):
     what_was_missed: List[str]
     improvements: List[str]
     ideal_answer: str
+    ideal_code: Optional[str] = None
     transcript: str                    # original Whisper transcript
     audio_url: Optional[str] = None
     code_snippet: Optional[str] = None

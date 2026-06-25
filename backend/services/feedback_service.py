@@ -34,7 +34,7 @@ GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
 MAX_RETRIES: int = int(os.getenv("MAX_RETRIES", "2"))
 RETRY_DELAY: float = float(os.getenv("RETRY_DELAY", "2"))
 
-GEMINI_MODEL = "gemini-3-flash-preview" # gemini-3.1-flash-lite
+GEMINI_MODEL = "gemini-3-flash-preview"  # gemini-3.1-flash-lite
 OLLAMA_MODEL = "llama3.2:3b"
 
 # ---------------------------------------------------------------------------
@@ -42,22 +42,20 @@ OLLAMA_MODEL = "llama3.2:3b"
 # ---------------------------------------------------------------------------
 RUBRIC: dict[str, str] = {
     "correctness": "Technical accuracy and depth of the answer",
-    "clarity":     "How easy the answer is to follow for a non-expert listener",
-    "structure":   "Logical flow: opening, body, conclusion (STAR/PREP preferred)",
-    "relevance":   "How directly the answer addresses what was actually asked",
+    "clarity": "How easy the answer is to follow for a non-expert listener",
+    "structure": "Logical flow: opening, body, conclusion (STAR/PREP preferred)",
+    "relevance": "How directly the answer addresses what was actually asked",
 }
 
 # JSON schema shown to the model as a concrete example
 _EXAMPLE_OUTPUT = {
     "overall_score": 7,
-    "scores": {
-        dim: {"score": 7, "feedback": "..."}
-        for dim in RUBRIC
-    },
-    "what_went_well":  ["point 1", "point 2"],
+    "scores": {dim: {"score": 7, "feedback": "..."} for dim in RUBRIC},
+    "what_went_well": ["point 1", "point 2"],
     "what_was_missed": ["point 1", "point 2"],
-    "improvements":    ["actionable suggestion 1", "actionable suggestion 2"],
-    "ideal_answer":    "A complete model answer to this question.",
+    "improvements": ["actionable suggestion 1", "actionable suggestion 2"],
+    "ideal_answer": "A complete model answer to this question.",
+    "ideal_code": "// Code snippet accompanying the ideal answer, if applicable",
 }
 
 
@@ -72,10 +70,10 @@ class FeedbackServiceError(Exception):
 # Prompt builder
 # ---------------------------------------------------------------------------
 def build_prompt(
-    question: str, 
-    transcript: str, 
-    code_snippet: str | None = None, 
-    code_language: str | None = None
+    question: str,
+    transcript: str,
+    code_snippet: str | None = None,
+    code_language: str | None = None,
 ) -> str:
     """
     Build the evaluation prompt used by Gemini / Ollama.
@@ -98,7 +96,7 @@ def build_prompt(
         f"  - {dim} (1-10): {desc}" for dim, desc in RUBRIC.items()
     )
     schema = json.dumps(_EXAMPLE_OUTPUT, indent=2)
-    
+
     code_section = ""
     if code_snippet and code_snippet.strip():
         lang = code_language or ""
@@ -130,6 +128,7 @@ def build_prompt(
         - `what_went_well` and `what_was_missed` should each have 2-4 bullet points.
         - `improvements` must be specific and actionable (e.g. "Mention Big-O complexity").
         - `ideal_answer` should be a complete, concise model answer (3-5 sentences).
+        - `ideal_code` should be an accompanying code snippet based on the ideal answer (if applicable to the question, else null/empty string).
         - `overall_score` is your holistic judgment, NOT a simple average.
 
         ## Output
@@ -137,6 +136,7 @@ def build_prompt(
 
         {schema}
     """).strip()
+
 
 # ---------------------------------------------------------------------------
 # JSON parser — strips markdown fences if a model wraps the response anyway
@@ -157,7 +157,9 @@ def _parse_json(raw: str) -> dict:
     try:
         return json.loads(text)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"JSON parse error: {exc}\nRaw response:\n{raw[:500]}") from exc
+        raise ValueError(
+            f"JSON parse error: {exc}\nRaw response:\n{raw[:500]}"
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +189,8 @@ def _gemini_retry_delay(exc: Exception) -> float:
     msg = str(exc)
     # API returns 'Please retry in X.XXXs'
     import re as _re
-    match = _re.search(r'retry in (\d+(?:\.\d+)?)s', msg)
+
+    match = _re.search(r"retry in (\d+(?:\.\d+)?)s", msg)
     if match:
         suggested = float(match.group(1))
         print(f"[feedback_service] Rate-limited. API says retry in {suggested}s.")
@@ -257,38 +260,76 @@ def get_feedback(
             try:
                 print(f"[feedback_service] Gemini attempt {attempt}/{MAX_RETRIES}...")
                 if on_status:
-                    on_status("gemini", attempt, "in_progress", f"Analyzing with Gemini (attempt {attempt})...")
+                    on_status(
+                        "gemini",
+                        attempt,
+                        "in_progress",
+                        f"Analyzing with Gemini (attempt {attempt})...",
+                    )
                 result = _call_gemini(prompt)
                 print("[feedback_service] Gemini succeeded.")
                 if on_status:
-                    on_status("gemini", attempt, "done", "Feedback generated via Gemini")
+                    on_status(
+                        "gemini", attempt, "done", "Feedback generated via Gemini"
+                    )
                 return result
             except Exception as exc:
                 print(f"[feedback_service] Gemini attempt {attempt} failed: {exc}")
                 if _is_quota_exhausted(exc):
-                    print("[feedback_service] Daily quota exhausted — skipping to Ollama.")
+                    print(
+                        "[feedback_service] Daily quota exhausted — skipping to Ollama."
+                    )
                     if on_status:
-                        on_status("gemini", attempt, "quota_exhausted", "Daily quota exhausted. Falling back to Ollama...")
+                        on_status(
+                            "gemini",
+                            attempt,
+                            "quota_exhausted",
+                            "Daily quota exhausted. Falling back to Ollama...",
+                        )
                     break
                 if attempt < MAX_RETRIES:
                     if on_status:
-                        on_status("gemini", attempt, "retrying", f"Gemini failed. Retrying in {_gemini_retry_delay(exc)}s...")
+                        on_status(
+                            "gemini",
+                            attempt,
+                            "retrying",
+                            f"Gemini failed. Retrying in {_gemini_retry_delay(exc)}s...",
+                        )
                     delay = _gemini_retry_delay(exc)
                     time.sleep(delay)
-        print("[feedback_service] Gemini exhausted all retries. Falling back to Ollama...")
+        print(
+            "[feedback_service] Gemini exhausted all retries. Falling back to Ollama..."
+        )
         if on_status:
-            on_status("gemini", MAX_RETRIES, "fallback", "Gemini exhausted retries. Falling back to Ollama...")
+            on_status(
+                "gemini",
+                MAX_RETRIES,
+                "fallback",
+                "Gemini exhausted retries. Falling back to Ollama...",
+            )
     else:
-        print("[feedback_service] GEMINI_API_KEY not set — skipping Gemini, using Ollama directly.")
+        print(
+            "[feedback_service] GEMINI_API_KEY not set — skipping Gemini, using Ollama directly."
+        )
         if on_status:
-            on_status("ollama", 1, "in_progress", "GEMINI_API_KEY not set. Using Ollama directly...")
+            on_status(
+                "ollama",
+                1,
+                "in_progress",
+                "GEMINI_API_KEY not set. Using Ollama directly...",
+            )
 
     # --- FALLBACK: Ollama llama3.2 ---
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             print(f"[feedback_service] Ollama attempt {attempt}/{MAX_RETRIES}...")
             if on_status:
-                on_status("ollama", attempt, "in_progress", f"Analyzing with Ollama (attempt {attempt})...")
+                on_status(
+                    "ollama",
+                    attempt,
+                    "in_progress",
+                    f"Analyzing with Ollama (attempt {attempt})...",
+                )
             result = _call_ollama(prompt)
             print("[feedback_service] Ollama succeeded.")
             if on_status:
@@ -298,7 +339,12 @@ def get_feedback(
             print(f"[feedback_service] Ollama attempt {attempt} failed: {exc}")
             if attempt < MAX_RETRIES:
                 if on_status:
-                    on_status("ollama", attempt, "retrying", f"Ollama failed. Retrying in {RETRY_DELAY}s...")
+                    on_status(
+                        "ollama",
+                        attempt,
+                        "retrying",
+                        f"Ollama failed. Retrying in {RETRY_DELAY}s...",
+                    )
                 time.sleep(RETRY_DELAY)
 
     raise FeedbackServiceError(

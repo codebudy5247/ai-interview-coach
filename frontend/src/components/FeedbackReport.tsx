@@ -168,9 +168,14 @@ export default function FeedbackReport({
         )}
 
         <Section id="section-ideal" emoji="🏆" title="Ideal Answer">
-          <p className="text-sm text-slate-300 leading-relaxed">
+          <p className="text-sm text-slate-300 leading-relaxed mb-3">
             {feedback.ideal_answer}
           </p>
+          {feedback.ideal_code && (
+            <pre className="text-sm text-slate-300 bg-slate-800 rounded-lg p-4 overflow-x-auto font-mono mt-3 border border-slate-700/50">
+              <code>{feedback.ideal_code}</code>
+            </pre>
+          )}
         </Section>
       </div>
 
